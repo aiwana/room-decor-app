@@ -17,6 +17,8 @@ interface ButtonProps {
   disabled?: boolean;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** Bat buoc khi nut chi co icon (title rong) de trinh doc man hinh doc duoc */
+  accessibilityLabel?: string;
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -27,6 +29,7 @@ const Button: React.FC<ButtonProps> = ({
   disabled = false,
   loading = false,
   style,
+  accessibilityLabel,
 }) => {
   const isDisabled = disabled || loading;
   const textColor = variant === 'ghost' ? COLORS.accent : COLORS.textPrimary;
@@ -36,7 +39,8 @@ const Button: React.FC<ButtonProps> = ({
       onPress={onPress}
       disabled={isDisabled}
       accessibilityRole="button"
-      accessibilityState={{ disabled: isDisabled }}
+      accessibilityLabel={accessibilityLabel ?? title}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
       style={({ pressed }) => [
         styles.base,
         styles[variant],

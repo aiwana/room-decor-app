@@ -5,30 +5,37 @@
  * Nhan param ?category=tile de mo san 1 danh muc.
  */
 import React, { useState } from 'react';
-import { FlatList, ScrollView, View } from 'react-native';
+import { ActivityIndicator, FlatList, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import ProductCard from '@/components/catalog/ProductCard';
 import Chip from '@/components/common/Chip';
 import { EmptyView, ErrorView, LoadingView } from '@/components/common/StateViews';
-import { CATEGORIES } from '@/data/mock/categories';
+import { getCategoryIcon } from '@/constants/categoryIcons';
+import { COLORS } from '@/constants/colors';
 import { useAsync } from '@/hooks/useAsync';
+import { getErrorMessage } from '@/services/apiError';
 import { productService } from '@/services/productService';
 import type { CategoryId } from '@/types';
 import { firstParam } from '@/utils/format';
 
 import styles from './styles';
 
-const isCategoryId = (v: unknown): v is CategoryId =>
-  typeof v === 'string' && CATEGORIES.some((c) => c.id === v);
-
 const CatalogScreen: React.FC = () => {
   const router = useRouter();
   const categoryParam = firstParam(useLocalSearchParams<{ category?: string }>().category);
 
-  const [category, setCategory] = useState<CategoryId | undefined>(
-    isCategoryId(categoryParam) ? categoryParam : undefined,
-  );
+  // Ma danh muc tu URL (vd ?category=tile). Danh muc khong ton tai -> danh sach rong + thong bao.
+  const [category, setCategory] = useState<CategoryId | undefined>(categoryParam || undefined);
+
+  /* Danh muc lay qua service (mock hoac API), khong doc thang data/mock */
+  const {
+    data: categories = [],
+    loading: categoriesLoading,
+    error: categoriesError,
+    reload: reloadCategories,
+  } = useAsync(() => productService.getCategories(), []);
+
   const {
     data: products = [],
     loading,
@@ -38,7 +45,7 @@ const CatalogScreen: React.FC = () => {
 
   const renderBody = (): React.JSX.Element => {
     if (loading) return <LoadingView />;
-    if (error) return <ErrorView message="Không tải được sản phẩm." onRetry={reload} />;
+    if (error) return <ErrorView message={`Không tải được sản phẩm. ${getErrorMessage(error)}`} onRetry={reload} />;
     if (products.length === 0) {
       return <EmptyView iconName="cube-outline" title="Chưa có sản phẩm trong danh mục này" />;
     }
@@ -67,11 +74,15 @@ const CatalogScreen: React.FC = () => {
       <View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categories}>
           <Chip label="Tất cả" selected={category === undefined} onPress={(): void => setCategory(undefined)} />
-          {CATEGORIES.map((c) => (
+          {categoriesLoading ? <ActivityIndicator color={COLORS.accent} style={styles.categoriesLoading} /> : null}
+          {categoriesError ? (
+            <Chip label="Lỗi tải danh mục, bấm để thử lại" iconName="refresh" onPress={reloadCategories} />
+          ) : null}
+          {categories.map((c) => (
             <Chip
               key={c.id}
               label={c.label}
-              iconName={c.iconName}
+              iconName={getCategoryIcon(c.id)}
               selected={category === c.id}
               onPress={(): void => setCategory(c.id)}
             />

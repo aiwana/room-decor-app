@@ -1,6 +1,11 @@
 /**
  * src/screens/ProfileScreen/index.tsx
- * Profile voi mock user. Dang nhap / dang xuat that lam khi co backend.
+ * Profile theo trang thai dang nhap (AuthContext):
+ *   - dang khoi phuc phien -> Loading
+ *   - chua dang nhap       -> the "Khach" + nut Dang nhap / Dang ky
+ *   - da dang nhap         -> thong tin user + nut Dang xuat
+ *   - loi khoi phuc phien  -> thong bao + Thu lai / Dang xuat
+ * Thong ke + menu luon hien (app van dung duoc khi chua dang nhap).
  */
 import React from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
@@ -9,12 +14,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { type Href, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import Button from '@/components/common/Button';
+import MockModeNotice from '@/components/common/MockModeNotice';
 import { ErrorView, LoadingView } from '@/components/common/StateViews';
 import { COLORS } from '@/constants/colors';
+import { useAuth } from '@/context/AuthContext';
 import { useDesigns } from '@/context/DesignContext';
-import { useAsync } from '@/hooks/useAsync';
-import { userService } from '@/services/userService';
-import type { IoniconName } from '@/types';
+import type { IoniconName, User } from '@/types';
 
 import styles from './styles';
 
@@ -28,56 +34,105 @@ interface MenuItem {
   danger?: boolean;
 }
 
-const comingSoon = (feature: string): void => {
-  Alert.alert(feature, 'Chức năng này sẽ có ở phiên bản sau.');
-};
+const UserCard: React.FC<{ user: User }> = ({ user }) => (
+  <View style={styles.userCard}>
+    {user.avatarUrl ? (
+      <Image source={{ uri: user.avatarUrl }} style={styles.avatar} contentFit="cover" />
+    ) : (
+      <View style={[styles.avatar, styles.avatarPlaceholder]}>
+        <Ionicons name="person" size={32} color={COLORS.textSecondary} />
+      </View>
+    )}
+    <View style={styles.userInfo}>
+      <Text style={styles.name}>{user.name}</Text>
+      <Text style={styles.email}>{user.email}</Text>
+    </View>
+  </View>
+);
 
 const ProfileScreen: React.FC = () => {
   const router = useRouter();
+  const { status, user, restoreError, logout, retryRestore } = useAuth();
   const { savedDesigns } = useDesigns();
-  const { data: user, loading, error, reload } = useAsync(() => userService.getCurrentUser(), []);
 
   const favoriteCount = savedDesigns.filter((d) => d.isFavorite).length;
+  const signedIn = status === 'signedIn' && user !== null;
+
+  const handleLogout = (): void => {
+    Alert.alert('Đăng xuất?', 'Bạn sẽ cần đăng nhập lại để đồng bộ thiết kế.', [
+      { text: 'Huỷ', style: 'cancel' },
+      { text: 'Đăng xuất', style: 'destructive', onPress: (): void => void logout() },
+    ]);
+  };
 
   const MENU: MenuItem[] = [
     { id: 'my-designs', label: 'Thiết kế của tôi', iconName: 'images-outline', href: '/history' },
     {
       id: 'favorites',
-      label: 'Yêu thích',
+      label: 'Thiết kế yêu thích',
       iconName: 'heart-outline',
       href: { pathname: '/history', params: { filter: 'favorite' } },
     },
-    { id: 'history', label: 'Lịch sử', iconName: 'time-outline', href: '/history' },
     { id: 'catalog', label: 'Vật liệu & sản phẩm', iconName: 'grid-outline', href: '/catalog' },
-    { id: 'settings', label: 'Cài đặt', iconName: 'settings-outline', onPress: (): void => comingSoon('Cài đặt') },
-    { id: 'help', label: 'Trợ giúp', iconName: 'help-circle-outline', onPress: (): void => comingSoon('Trợ giúp') },
+    { id: 'settings', label: 'Cài đặt & kết nối máy chủ', iconName: 'settings-outline', href: '/settings' },
     {
-      id: 'logout',
-      label: 'Đăng xuất',
-      iconName: 'log-out-outline',
-      danger: true,
-      onPress: (): void => comingSoon('Đăng xuất (cần backend)'),
+      id: 'help',
+      label: 'Trợ giúp',
+      iconName: 'help-circle-outline',
+      onPress: (): void => Alert.alert('Trợ giúp', 'Chức năng này sẽ có ở phiên bản sau.'),
     },
+    ...(signedIn
+      ? [{ id: 'logout', label: 'Đăng xuất', iconName: 'log-out-outline' as const, danger: true, onPress: handleLogout }]
+      : []),
   ];
 
-  if (loading) {
-    return <LoadingView />;
+  if (status === 'restoring') {
+    return (
+      <SafeAreaView style={styles.screen} edges={['top']}>
+        <LoadingView message="Đang kiểm tra đăng nhập..." />
+      </SafeAreaView>
+    );
   }
-  if (error || !user) {
-    return <ErrorView message="Không tải được thông tin tài khoản." onRetry={reload} />;
+
+  if (status === 'error') {
+    return (
+      <SafeAreaView style={styles.screen} edges={['top']}>
+        <ErrorView message={restoreError ?? 'Không khôi phục được phiên đăng nhập.'} onRetry={retryRestore} />
+        <Button title="Đăng xuất" variant="ghost" onPress={(): void => void logout()} style={styles.errorLogout} />
+      </SafeAreaView>
+    );
   }
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* ===== Thong tin user ===== */}
-        <View style={styles.userCard}>
-          <Image source={{ uri: user.avatarUrl }} style={styles.avatar} contentFit="cover" />
-          <View style={styles.userInfo}>
-            <Text style={styles.name}>{user.name}</Text>
-            <Text style={styles.email}>{user.email}</Text>
-          </View>
-        </View>
+        {/* ===== Thong tin user / khach ===== */}
+        {signedIn ? (
+          <UserCard user={user} />
+        ) : (
+          <>
+            <View style={styles.userCard}>
+              <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                <Ionicons name="person-outline" size={32} color={COLORS.textSecondary} />
+              </View>
+              <View style={styles.userInfo}>
+                <Text style={styles.name}>Khách</Text>
+                <Text style={styles.email}>Đăng nhập để lưu thiết kế vào tài khoản.</Text>
+              </View>
+            </View>
+            <View style={styles.guestActions}>
+              <Button title="Đăng nhập" onPress={(): void => router.push('/login')} style={styles.guestButton} />
+              <Button
+                title="Đăng ký"
+                variant="secondary"
+                onPress={(): void => router.push('/register')}
+                style={styles.guestButton}
+              />
+            </View>
+          </>
+        )}
+
+        <MockModeNotice style={styles.notice} />
 
         {/* ===== Thong ke ===== */}
         <View style={styles.stats}>
@@ -97,6 +152,7 @@ const ProfileScreen: React.FC = () => {
             <Pressable
               key={item.id}
               style={({ pressed }) => [styles.menuItem, pressed && styles.menuPressed]}
+              accessibilityRole="button"
               onPress={(): void => {
                 if (item.href) {
                   router.navigate(item.href);

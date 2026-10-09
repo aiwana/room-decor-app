@@ -5,6 +5,7 @@ import { COLORS, RADIUS, SPACING } from '@/constants/colors';
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
   scrollContent: { padding: SPACING.md, paddingBottom: SPACING.xl },
+  notice: { marginHorizontal: 0 },
   productRow: {
     flexDirection: 'row',
     gap: 12,

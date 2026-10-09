@@ -2,24 +2,22 @@
  * src/types/product.ts
  * Type cho MODULE PHU: Catalog vat lieu / san pham.
  */
-import type { IoniconName } from './common';
+/**
+ * Don vi tinh, vd 'm2', 'viên', 'bao', 'thùng', 'lít', 'cái', 'bộ'.
+ * De `string` (khong phai union co dinh) vi danh sach se do database quan ly.
+ */
+export type UnitOfMeasure = string;
 
-/** Don vi tinh */
-export type UnitOfMeasure = 'm2' | 'viên' | 'bao' | 'thùng' | 'lít' | 'tấn' | 'cái' | 'bộ';
-
-export type CategoryId =
-  | 'tile'
-  | 'paint'
-  | 'cement'
-  | 'adhesive'
-  | 'flooring'
-  | 'furniture'
-  | 'lighting';
+/**
+ * Ma danh muc, vd 'tile', 'paint'. De `string` vi danh muc lay tu backend.
+ * Icon cua danh muc do frontend tu chon (constants/categoryIcons.ts),
+ * backend khong can biet ten icon.
+ */
+export type CategoryId = string;
 
 export interface Category {
   id: CategoryId;
   label: string;
-  iconName: IoniconName;
 }
 
 /** 1 dong thong so ky thuat, vd { label: 'Kích thước', value: '60x60 cm' } */
@@ -35,6 +33,8 @@ export interface Product {
   price: number; // VND
   unit: UnitOfMeasure;
   categoryId: CategoryId;
+  /** Ten danh muc de hien thi (DE XUAT: backend tra kem, tranh phai tai danh muc rieng) */
+  categoryName?: string;
   imageUrl: string;
   rating: number; // 0..5
   reviewCount: number;

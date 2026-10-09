@@ -11,6 +11,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import Button from '@/components/common/Button';
 import Chip from '@/components/common/Chip';
+import MockModeNotice from '@/components/common/MockModeNotice';
 import SectionHeader from '@/components/common/SectionHeader';
 import { EmptyView, ErrorView, LoadingView } from '@/components/common/StateViews';
 import BeforeAfterView from '@/components/decor/BeforeAfterView';
@@ -21,6 +22,7 @@ import { useDesigns } from '@/context/DesignContext';
 import { useAsync } from '@/hooks/useAsync';
 import { productService } from '@/services/productService';
 import type { Design } from '@/types';
+import { showError } from '@/utils/alert';
 import { firstParam, formatDate } from '@/utils/format';
 
 import styles from './styles';
@@ -28,11 +30,12 @@ import styles from './styles';
 const ResultScreen: React.FC = () => {
   const router = useRouter();
   const id = firstParam(useLocalSearchParams<{ id: string }>().id) ?? '';
-  const { getDesign, isSaved, saveDesign, toggleFavorite, loading } = useDesigns();
+  const { getDesign, isSaved, saveDesign, toggleFavorite, refreshDesign, loading } = useDesigns();
   const design: Design | undefined = getDesign(id);
   const saved = isSaved(id);
 
   const [saving, setSaving] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
 
   /* --------- Tai thong tin vat lieu (module Catalog) --------- */
   const productIds = design?.products.map((p) => p.productId).join(',') ?? '';
@@ -84,11 +87,35 @@ const ResultScreen: React.FC = () => {
 
   /* ---------------- Handlers ---------------- */
   const handleSave = async (): Promise<void> => {
+    if (saving) return;
     setSaving(true);
     try {
       await saveDesign(design.id);
+    } catch (e) {
+      showError('Không lưu được thiết kế', e);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleFavorite = async (): Promise<void> => {
+    try {
+      await toggleFavorite(design.id);
+    } catch (e) {
+      showError('Không cập nhật được yêu thích', e);
+    }
+  };
+
+  /** AI con 'processing' -> hoi lai may chu (mock luon 'done' nen khong gap) */
+  const handleRefresh = async (): Promise<void> => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await refreshDesign(design.id);
+    } catch (e) {
+      showError('Không kiểm tra được trạng thái', e);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -107,6 +134,13 @@ const ResultScreen: React.FC = () => {
         <View style={styles.processing}>
           <ActivityIndicator size="large" color={COLORS.accent} />
           <Text style={styles.processingText}>AI đang xử lý thiết kế...</Text>
+          <Button
+            title="Kiểm tra lại"
+            iconName="refresh"
+            variant="ghost"
+            onPress={(): void => void handleRefresh()}
+            loading={refreshing}
+          />
         </View>
       ) : (
         <BeforeAfterView beforeUri={design.originalImageUri} afterUri={design.resultImageUrl} />
@@ -122,7 +156,8 @@ const ResultScreen: React.FC = () => {
         </View>
         <Pressable
           style={styles.heart}
-          onPress={(): void => void toggleFavorite(design.id)}
+          onPress={(): void => void handleToggleFavorite()}
+          accessibilityRole="button"
           accessibilityLabel={design.isFavorite ? 'Bỏ yêu thích' : 'Yêu thích'}
         >
           <Ionicons
@@ -150,8 +185,16 @@ const ResultScreen: React.FC = () => {
           style={styles.actionFlex}
         />
         <Button title="Thiết kế lại" iconName="refresh" variant="secondary" onPress={handleRedesign} style={styles.actionFlex} />
-        <Button title="" iconName="share-social-outline" variant="secondary" onPress={handleShare} style={styles.shareBtn} />
+        <Button
+          title=""
+          accessibilityLabel="Chia sẻ thiết kế"
+          iconName="share-social-outline"
+          variant="secondary"
+          onPress={handleShare}
+          style={styles.shareBtn}
+        />
       </View>
+      {saved ? <MockModeNotice style={styles.notice} message="Chế độ minh họa: thiết kế được lưu trên máy này." /> : null}
 
       {/* ===== Vat lieu duoc su dung (noi sang Catalog) ===== */}
       <SectionHeader

@@ -6,7 +6,7 @@
  * Nhan params (tu Home / Result "Thiet ke lai"):
  *   imageUri, roomType, style, colorTheme
  */
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { FlatList, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -28,6 +28,7 @@ import {
 } from '@/constants/decorOptions';
 import { useDesigns } from '@/context/DesignContext';
 import { useRoomImagePicker } from '@/hooks/useRoomImagePicker';
+import { getErrorMessage } from '@/services/apiError';
 import type { ColorThemeId, DesignStyleId, DesignStyleOption, RoomTypeId } from '@/types';
 import { firstParam } from '@/utils/format';
 
@@ -54,6 +55,8 @@ const AIDecorScreen: React.FC = () => {
   const [prompt, setPrompt] = useState<string>('');
   const [generating, setGenerating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  // Chong bam Generate 2 lan lien tiep truoc khi state kip cap nhat
+  const generatingRef = useRef<boolean>(false);
 
   /* -------- Nhan du lieu dien san tu man khac (qua URL params) -------- */
   const pImage = firstParam(params.imageUri);
@@ -87,7 +90,8 @@ const AIDecorScreen: React.FC = () => {
   };
 
   const handleGenerate = async (): Promise<void> => {
-    if (!imageUri || !roomType || !style) return;
+    if (!imageUri || !roomType || !style || generatingRef.current) return;
+    generatingRef.current = true;
     setError(null);
     setGenerating(true);
     try {
@@ -100,8 +104,10 @@ const AIDecorScreen: React.FC = () => {
       });
       router.push({ pathname: '/result/[id]', params: { id: design.id } });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'AI chưa xử lý được ảnh này.');
+      // Loi mang / HTTP duoc doi sang cau tieng Viet (apiError.ts)
+      setError(getErrorMessage(e));
     } finally {
+      generatingRef.current = false;
       setGenerating(false);
     }
   };

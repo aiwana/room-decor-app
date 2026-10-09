@@ -2,7 +2,7 @@
  * src/components/catalog/ProductCard.tsx
  * The san pham (module Catalog). Chuyen tu components/ProductCard.tsx cu:
  * - Chi con hien thi Product (phan Project da tach thanh InspirationCard)
- * - Them rating + danh muc
+ * - Them rating + danh muc (ten danh muc lay tu product.categoryName, khong doc mock)
  * variant 'horizontal' -> cuon ngang (Home); 'grid' -> luoi 2 cot (Catalog)
  */
 import React from 'react';
@@ -11,7 +11,6 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 
 import { COLORS, RADIUS } from '@/constants/colors';
-import { CATEGORIES } from '@/data/mock/categories';
 import type { Product } from '@/types';
 import { formatVnd } from '@/utils/format';
 
@@ -22,8 +21,6 @@ interface ProductCardProps {
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ product, variant = 'grid', onPress }) => {
-  const categoryLabel = CATEGORIES.find((c) => c.id === product.categoryId)?.label ?? '';
-
   return (
     <Pressable
       style={({ pressed }) => [
@@ -33,11 +30,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, variant = 'grid', on
       ]}
       onPress={(): void => onPress(product)}
       accessibilityRole="button"
+      accessibilityLabel={product.name}
     >
       <Image source={{ uri: product.imageUrl }} style={styles.image} contentFit="cover" transition={200} />
       <View style={styles.info}>
         <Text style={styles.category} numberOfLines={1}>
-          {categoryLabel}
+          {product.categoryName ?? ''}
         </Text>
         <Text style={styles.title} numberOfLines={2}>
           {product.name}

@@ -12,8 +12,17 @@ Giai đoạn hiện tại: **frontend dùng mock data** (chưa có backend / AI 
 ```bash
 npm install
 npx expo start          # nhấn "a" để mở Android Emulator, hoặc quét QR bằng Expo Go
-npm run typecheck       # kiểm tra TypeScript
-npm run lint            # kiểm tra ESLint
+npm run typecheck       # kiểm tra TypeScript (chỉ frontend, không quét backend/)
+npm run lint            # kiểm tra ESLint (chỉ frontend)
+```
+
+Backend nằm trong `backend/` và có `package.json`, `tsconfig.json` riêng:
+
+```bash
+cd backend
+npm install
+npm run dev             # http://localhost:3000/health
+npm run typecheck
 ```
 
 Nếu vừa đổi route/thư mục mà gặp lỗi lạ: `npx expo start -c` (xoá cache).
@@ -38,6 +47,8 @@ Home ─► Vật liệu nổi bật ─► Catalog ─► Product Detail
 | `/catalog` | Catalog (`?category=tile`) | Stack |
 | `/catalog/[productId]` | Chi tiết sản phẩm | Stack |
 | `/quote-request` | Form báo giá | Modal |
+| `/login`, `/register` | Đăng nhập / đăng ký | Modal |
+| `/settings` | Cài đặt: chế độ dữ liệu, địa chỉ API, kiểm tra kết nối | Stack |
 
 ## Cấu trúc thư mục
 
@@ -47,9 +58,10 @@ src/
   screens/      Code thật của từng màn hình (index.tsx + styles.ts)
   components/   common/ home/ decor/ design/ catalog/
   constants/    colors.ts (màu, spacing), decorOptions.ts (loại phòng, phong cách, màu)
-  context/      DesignContext: danh sách thiết kế dùng chung
+  context/      AuthContext (đăng nhập), DesignContext (danh sách thiết kế)
   hooks/        useAsync (tải dữ liệu), useRoomImagePicker (camera / thư viện)
-  services/     Cổng duy nhất tới dữ liệu: aiService, designService, productService...
+  services/     Cổng duy nhất tới dữ liệu: apiClient, apiError, endpoints, authService,
+                aiService, designService, productService, quoteService, healthService
   data/mock/    Toàn bộ dữ liệu giả
   types/        Type TypeScript
   utils/        format tiền, ngày...
@@ -58,12 +70,21 @@ src/
 ## Mock → Backend / AI thật
 
 Màn hình **không bao giờ** import thẳng `data/mock`. Mọi dữ liệu đi qua `src/services/`.
-Mỗi service có 2 nhánh: mock và gọi API (axios). Khi có backend, tạo file `.env`:
+Mỗi service có 2 bản cùng 1 interface: `mockXxxService` và `apiXxxService`, chọn theo `USE_MOCK`.
 
-```
-EXPO_PUBLIC_USE_MOCK=false
-EXPO_PUBLIC_API_URL=http://10.0.2.2:8080
-```
+- Đường dẫn API: chỉ ở `src/services/endpoints.ts`. Hiện backend **chỉ có** `GET /health`,
+  các đường dẫn khác là **đề xuất** (xem `docs/api-contract-de-xuat.md`).
+- Địa chỉ backend: chỉ ở `src/services/config.ts`, đổi bằng file `.env` (xem `.env.example`):
 
-AI: chỉ cần sửa `generateWithApi()` trong `src/services/aiService.ts`. UI không phải sửa.
+| Chạy app ở đâu | `EXPO_PUBLIC_API_URL` |
+|---|---|
+| Android Emulator | `http://10.0.2.2:3000` (mặc định nếu bỏ trống) |
+| Web trên cùng máy | `http://localhost:3000` (mặc định nếu bỏ trống) |
+| Điện thoại thật (Expo Go) | `http://<IPv4 của máy tính>:3000`, lấy bằng `ipconfig`, cùng Wi-Fi |
+
+- Kiểm tra kết nối: Profile → **Cài đặt & kết nối máy chủ** → *Kiểm tra kết nối*.
+- Lỗi mạng/HTTP được đổi sang tiếng Việt ở `src/services/apiError.ts`.
+- Token đăng nhập lưu bằng `expo-secure-store` (không dùng AsyncStorage, không lưu mật khẩu).
+
+AI thật: chỉ cần sửa `apiAiService` trong `src/services/aiService.ts`. UI không phải sửa.
 Thử màn hình lỗi của AI: đặt `MOCK_AI_FAIL_RATE = 0.5` trong `src/services/config.ts`.

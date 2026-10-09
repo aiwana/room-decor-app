@@ -3,7 +3,7 @@
  * MODULE PHU: chi tiet san pham + Yeu thich + Yeu cau bao gia / lien he.
  * URL: /catalog/[productId]
  */
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,9 +13,10 @@ import Button from '@/components/common/Button';
 import Chip from '@/components/common/Chip';
 import { EmptyView, ErrorView, LoadingView } from '@/components/common/StateViews';
 import { COLORS } from '@/constants/colors';
-import { CATEGORIES } from '@/data/mock/categories';
 import { useAsync } from '@/hooks/useAsync';
-import { productService } from '@/services/productService';
+import { getErrorMessage } from '@/services/apiError';
+import { favoriteProductStore, productService } from '@/services/productService';
+import { showError } from '@/utils/alert';
 import { firstParam, formatVnd } from '@/utils/format';
 
 import styles from './styles';
@@ -27,7 +28,7 @@ const ProductDetailScreen: React.FC = () => {
   const { data, loading, error, reload } = useAsync(async () => {
     const [product, favIds] = await Promise.all([
       productService.getProductById(productId),
-      productService.getFavoriteIds(),
+      favoriteProductStore.getIds(),
     ]);
     return { product, isFavorite: favIds.includes(productId) };
   }, [productId]);
@@ -36,9 +37,11 @@ const ProductDetailScreen: React.FC = () => {
   const [favoriteOverride, setFavoriteOverride] = useState<boolean | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  // Dang luu yeu thich -> bo qua cac lan bam tiep theo
+  const favoriteBusy = useRef<boolean>(false);
 
   if (loading) return <LoadingView />;
-  if (error) return <ErrorView message="Không tải được sản phẩm." onRetry={reload} />;
+  if (error) return <ErrorView message={`Không tải được sản phẩm. ${getErrorMessage(error)}`} onRetry={reload} />;
   const product = data?.product;
   if (!product) return <EmptyView iconName="cube-outline" title="Không tìm thấy sản phẩm" />;
 
@@ -46,13 +49,23 @@ const ProductDetailScreen: React.FC = () => {
   const color = selectedColor ?? product.colors[0] ?? null;
   const size = selectedSize ?? product.sizes[0] ?? null;
 
+  /** Yeu thich san pham: hien chi luu tren may (xem productService.ts) */
   const handleToggleFavorite = async (): Promise<void> => {
-    const next = !isFavorite;
-    setFavoriteOverride(next); // cap nhat UI truoc cho muot
-    await productService.setFavorite(productId, next);
+    if (favoriteBusy.current) return;
+    favoriteBusy.current = true;
+    const previous = isFavorite;
+    setFavoriteOverride(!previous); // cap nhat UI truoc cho muot
+    try {
+      await favoriteProductStore.set(productId, !previous);
+    } catch (e) {
+      setFavoriteOverride(previous); // luu that bai -> tra lai trang thai cu
+      showError('Không lưu được yêu thích', e);
+    } finally {
+      favoriteBusy.current = false;
+    }
   };
 
-  const categoryLabel = CATEGORIES.find((c) => c.id === product.categoryId)?.label ?? '';
+  const categoryLabel = product.categoryName ?? '';
 
   return (
     <View style={styles.screen}>
@@ -64,7 +77,8 @@ const ProductDetailScreen: React.FC = () => {
           <View style={styles.titleRow}>
             <View style={styles.titleText}>
               <Text style={styles.category}>
-                {categoryLabel} · {product.brand}
+                {categoryLabel ? `${categoryLabel} · ` : ''}
+                {product.brand}
               </Text>
               <Text style={styles.name}>{product.name}</Text>
             </View>

@@ -6,7 +6,7 @@
  *   | Vat lieu noi bat (module phu, dat cuoi trang)
  * Giu layout cu (dark theme, 2 o gradient, FlatList ngang), doi noi dung.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,8 +21,9 @@ import QuickActionItem from '@/components/home/QuickActionItem';
 import StyleCard from '@/components/home/StyleCard';
 import { COLORS } from '@/constants/colors';
 import { DESIGN_STYLES, getRoomTypeLabel, getStyleLabel } from '@/constants/decorOptions';
+import { INSPIRATIONS } from '@/constants/inspirations';
 import { useDesigns } from '@/context/DesignContext';
-import { INSPIRATIONS } from '@/data/mock/inspirations';
+import { useAsync } from '@/hooks/useAsync';
 import { useRoomImagePicker } from '@/hooks/useRoomImagePicker';
 import { productService } from '@/services/productService';
 import type { Design, DesignStyleOption, Inspiration, Product, QuickAction } from '@/types';
@@ -49,27 +50,14 @@ const HomeScreen: React.FC = () => {
 
   /* ---------------- State ---------------- */
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [featured, setFeatured] = useState<Product[]>([]);
-  const [featuredLoading, setFeaturedLoading] = useState<boolean>(true);
 
   /* --- Vat lieu noi bat: tai rieng, KHONG chan phan AI phia tren --- */
-  useEffect(() => {
-    let mounted = true;
-    productService
-      .getFeatured()
-      .then((data): void => {
-        if (mounted) setFeatured(data);
-      })
-      .catch((): void => {
-        if (mounted) setFeatured([]);
-      })
-      .finally((): void => {
-        if (mounted) setFeaturedLoading(false);
-      });
-    return (): void => {
-      mounted = false;
-    };
-  }, []);
+  const {
+    data: featured = [],
+    loading: featuredLoading,
+    error: featuredError,
+    reload: reloadFeatured,
+  } = useAsync(() => productService.getFeatured(), []);
 
   /* ---------------- Search: loc phong cach / thiet ke / cam hung ---------------- */
   const q = searchQuery.trim().toLowerCase();
@@ -148,8 +136,10 @@ const HomeScreen: React.FC = () => {
             style={styles.bellButton}
             onPress={(): void => router.navigate('/history')}
             accessibilityLabel="Lịch sử thiết kế"
+            accessibilityRole="button"
           >
-            <Ionicons name="notifications-outline" size={24} color={COLORS.textPrimary} />
+            {/* Truoc la icon chuong (thong bao) nhung lai mo Lich su -> doi icon cho dung chuc nang */}
+            <Ionicons name="time-outline" size={24} color={COLORS.textPrimary} />
           </Pressable>
         </View>
 
@@ -250,6 +240,14 @@ const HomeScreen: React.FC = () => {
         <SectionHeader title="Vật liệu nổi bật" actionLabel="Xem tất cả" onAction={(): void => router.push('/catalog')} />
         {featuredLoading ? (
           <ActivityIndicator color={COLORS.accent} />
+        ) : featuredError ? (
+          <Pressable onPress={reloadFeatured} accessibilityRole="button" style={styles.sectionMessage}>
+            <Text style={styles.sectionMessageText}>Không tải được vật liệu. Bấm để thử lại.</Text>
+          </Pressable>
+        ) : featured.length === 0 ? (
+          <View style={styles.sectionMessage}>
+            <Text style={styles.sectionMessageText}>Chưa có vật liệu nổi bật.</Text>
+          </View>
         ) : (
           <FlatList
             horizontal

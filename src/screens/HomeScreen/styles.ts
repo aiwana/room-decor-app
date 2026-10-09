@@ -59,6 +59,8 @@ const styles = StyleSheet.create({
   },
   /* ---------- Danh sach ngang ---------- */
   listContent: { paddingHorizontal: SPACING.md },
+  sectionMessage: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
+  sectionMessageText: { fontSize: 13, color: COLORS.textSecondary },
 });
 
 export default styles;

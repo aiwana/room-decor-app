@@ -5,6 +5,7 @@ import { COLORS, RADIUS, SPACING } from '@/constants/colors';
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
   scrollContent: { paddingTop: SPACING.sm, paddingBottom: SPACING.xl },
+  notice: { marginTop: SPACING.sm },
   processing: {
     marginHorizontal: SPACING.md,
     aspectRatio: 4 / 3,

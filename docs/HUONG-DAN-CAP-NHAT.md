@@ -10,7 +10,7 @@ git commit -m "backup truoc khi cap nhat frontend"
 git checkout -b feature/frontend-mock
 ```
 
-Nếu có gì sai, quay lại bằng `git checkout main`.
+Nếu có gì sai, quay lại bằng `git checkout master` (repo dùng nhánh `master`).
 
 ## 2. Chép code mới
 

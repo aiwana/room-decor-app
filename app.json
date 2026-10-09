@@ -40,7 +40,8 @@
           "photosPermission": "Room Decor AI cần truy cập thư viện ảnh để bạn chọn ảnh căn phòng.",
           "cameraPermission": "Room Decor AI cần dùng camera để chụp ảnh căn phòng."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

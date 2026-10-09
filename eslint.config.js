@@ -5,6 +5,7 @@ const expoConfig = require('eslint-config-expo/flat');
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ['dist/*'],
+    // backend/ co tsconfig + package.json rieng, kiem tra bang `cd backend && npm run typecheck`
+    ignores: ['dist/*', 'backend/**'],
   },
 ]);

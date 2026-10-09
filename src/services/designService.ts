@@ -1,20 +1,34 @@
 /**
  * src/services/designService.ts
  * Luu / doc / xoa thiet ke.
- * Mock: luu tren may bang AsyncStorage (con du lieu sau khi tat app).
- * Backend: goi /api/designs.
+ *   - Mock: luu tren may bang AsyncStorage (con du lieu sau khi tat app,
+ *     nhung CHI tren may nay, khong dong bo len may chu).
+ *   - API : goi /api/designs (endpoint DE XUAT, backend chua co).
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { SAMPLE_DESIGNS } from '@/data/mock/designs';
 import type { Design } from '@/types';
 
-import { apiClient } from './apiClient';
+import { request, send } from './apiClient';
 import { USE_MOCK } from './config';
+import { ENDPOINTS } from './endpoints';
+import { isDesign, isDesignList } from './validators';
 
-const STORAGE_KEY = 'roomdecor:designs';
+export interface DesignService {
+  /** Danh sach thiet ke da luu, moi nhat truoc */
+  list(): Promise<Design[]>;
+  /** Lay lai 1 thiet ke (dung khi AI con 'processing') */
+  getById(id: string): Promise<Design | undefined>;
+  /** Luu thiet ke (giu ca trang thai isFavorite cua tham so) */
+  save(design: Design): Promise<void>;
+  remove(id: string): Promise<void>;
+  setFavorite(id: string, isFavorite: boolean): Promise<void>;
+}
 
 /* ------------------------------ MOCK ------------------------------ */
+const STORAGE_KEY = 'roomdecor:designs';
+
 const readLocal = async (): Promise<Design[]> => {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
   if (raw === null) {
@@ -22,55 +36,53 @@ const readLocal = async (): Promise<Design[]> => {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(SAMPLE_DESIGNS));
     return SAMPLE_DESIGNS;
   }
-  return JSON.parse(raw) as Design[];
+  try {
+    const value: unknown = JSON.parse(raw);
+    return isDesignList(value) ? value : [];
+  } catch {
+    return []; // du lieu hong -> khong crash, coi nhu trong
+  }
 };
 
 const writeLocal = (designs: Design[]): Promise<void> =>
   AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(designs));
 
-/* ----------------------------- PUBLIC ----------------------------- */
-export const designService = {
-  /** Danh sach thiet ke da luu, moi nhat truoc */
-  async list(): Promise<Design[]> {
-    if (!USE_MOCK) {
-      const res = await apiClient.get<Design[]>('/api/designs');
-      return res.data;
-    }
+const mockDesignService: DesignService = {
+  async list() {
     const designs = await readLocal();
     return [...designs].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
-
-  /** Luu (hoac cap nhat neu da ton tai) */
-  async save(design: Design): Promise<void> {
-    if (!USE_MOCK) {
-      // Backend da tao design khi generate -> chi can danh dau "da luu"
-      await apiClient.post(`/api/designs/${design.id}/save`);
-      return;
-    }
-    const designs = await readLocal();
-    const others = designs.filter((d) => d.id !== design.id);
+  async getById(id) {
+    return (await readLocal()).find((d) => d.id === id);
+  },
+  async save(design) {
+    const others = (await readLocal()).filter((d) => d.id !== design.id);
     await writeLocal([design, ...others]);
   },
-
-  async remove(id: string): Promise<void> {
-    if (!USE_MOCK) {
-      await apiClient.delete(`/api/designs/${id}`);
-      return;
-    }
-    const designs = await readLocal();
-    await writeLocal(designs.filter((d) => d.id !== id));
+  async remove(id) {
+    await writeLocal((await readLocal()).filter((d) => d.id !== id));
   },
-
-  async setFavorite(id: string, isFavorite: boolean): Promise<void> {
-    if (!USE_MOCK) {
-      if (isFavorite) {
-        await apiClient.post(`/api/designs/${id}/favorite`);
-      } else {
-        await apiClient.delete(`/api/designs/${id}/favorite`);
-      }
-      return;
-    }
-    const designs = await readLocal();
-    await writeLocal(designs.map((d) => (d.id === id ? { ...d, isFavorite } : d)));
+  async setFavorite(id, isFavorite) {
+    await writeLocal((await readLocal()).map((d) => (d.id === id ? { ...d, isFavorite } : d)));
   },
 };
+
+/* ---------------------- API (endpoint DE XUAT) ---------------------- */
+const apiDesignService: DesignService = {
+  list: () => request({ method: 'GET', url: ENDPOINTS.DESIGNS }, isDesignList),
+  getById: (id) => request({ method: 'GET', url: ENDPOINTS.design(id) }, isDesign),
+  async save(design) {
+    // Backend tao design ngay khi generate -> o day chi danh dau "da luu"
+    await send({ method: 'POST', url: ENDPOINTS.designSave(design.id) });
+    // Bam "yeu thich" tren thiet ke chua luu: luu xong phai gui them yeu thich,
+    // neu khong trang thai nay se bi mat (loi audit da ghi nhan)
+    if (design.isFavorite) {
+      await send({ method: 'POST', url: ENDPOINTS.designFavorite(design.id) });
+    }
+  },
+  remove: (id) => send({ method: 'DELETE', url: ENDPOINTS.design(id) }),
+  setFavorite: (id, isFavorite) =>
+    send({ method: isFavorite ? 'POST' : 'DELETE', url: ENDPOINTS.designFavorite(id) }),
+};
+
+export const designService: DesignService = USE_MOCK ? mockDesignService : apiDesignService;

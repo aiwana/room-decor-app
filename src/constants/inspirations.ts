@@ -1,6 +1,7 @@
 /**
- * src/data/mock/inspirations.ts
- * Anh cam hung tren Home (thay cho "Du an tieu bieu" cua app vat lieu cu).
+ * src/constants/inspirations.ts
+ * Anh cam hung tren Home. Day la NOI DUNG CO DINH cua app (giong decorOptions.ts),
+ * khong phai du lieu tu backend, nen dat trong constants/ (truoc o data/mock/).
  */
 import type { Inspiration } from '@/types';
 
