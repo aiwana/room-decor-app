@@ -16,14 +16,23 @@ npm run typecheck       # kiểm tra TypeScript (chỉ frontend, không quét ba
 npm run lint            # kiểm tra ESLint (chỉ frontend)
 ```
 
-Backend nằm trong `backend/` và có `package.json`, `tsconfig.json` riêng:
+Backend nằm trong `backend/` và có `package.json`, `tsconfig.json` riêng. Backend dùng PostgreSQL; trước khi chạy,
+tạo database `room_decor`, sao chép `backend/.env.example` thành `backend/.env`, rồi đặt `DATABASE_URL`
+và một giá trị bí mật ngẫu nhiên dài ít nhất 32 ký tự cho `JWT_SECRET`:
+
+Hướng dẫn tạo database và cấu hình PostgreSQL đầy đủ: [docs/backend-postgresql-setup.md](./docs/backend-postgresql-setup.md).
 
 ```bash
 cd backend
 npm install
-npm run dev             # http://localhost:3000/health
+npm run dev             # khởi tạo bảng + dữ liệu mẫu; http://localhost:3000/health
 npm run typecheck
 ```
+
+Đặt `EXPO_PUBLIC_USE_MOCK=false` trong file `.env` tại gốc dự án để app gọi API thật.
+Đặt `EXPO_PUBLIC_API_URL` theo địa chỉ backend đang chạy (xem `.env.example`); khi dùng điện thoại thật,
+địa chỉ phải là IPv4 LAN của máy chạy backend và hai thiết bị phải cùng mạng. Không đưa `DATABASE_URL` hay
+`JWT_SECRET` vào biến `EXPO_PUBLIC_*`.
 
 Nếu vừa đổi route/thư mục mà gặp lỗi lạ: `npx expo start -c` (xoá cache).
 

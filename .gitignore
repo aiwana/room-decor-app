@@ -38,6 +38,8 @@ yarn-error.*
 *.tsbuildinfo
 
 example
+backend/dist/
+backend/storage/uploads/
 
 # generated native folders
 /ios

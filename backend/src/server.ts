@@ -1,21 +1,16 @@
+import { app } from "./routes";
+import { config } from "./config";
+import { initializeDatabase, pool } from "./db";
 
-import express from "express";
-
-const app = express();
-const PORT = 3000;
-
-// Cho phép backend đọc request có nội dung JSON
-app.use(express.json());
-
-// API kiểm tra trạng thái backend
-app.get("/health", (_req, res) => {
-  res.status(200).json({
-    status: "ok",
-    message: "Room Decor AI backend is running",
+const start = async (): Promise<void> => {
+  await initializeDatabase();
+  app.listen(config.PORT, () => {
+    console.log(`Backend is running at http://localhost:${config.PORT}`);
   });
-});
+};
 
-// Khởi động server
-app.listen(PORT, () => {
-  console.log(`Backend is running at http://localhost:${PORT}`);
+void start().catch(async (error: unknown) => {
+  console.error("Backend startup failed", error);
+  await pool.end();
+  process.exitCode = 1;
 });

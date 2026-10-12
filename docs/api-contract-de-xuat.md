@@ -1,81 +1,73 @@
-# API contract — ĐỀ XUẤT (chưa thống nhất)
+# API contract — Đã triển khai
 
-> Trạng thái 09/10/2026: backend **chỉ có** `GET /health`. Mọi endpoint còn lại trong file này là **đề xuất của frontend**,
-> chưa được triển khai. Người làm backend sửa trực tiếp file này khi đồng ý/không đồng ý, frontend sẽ sửa theo
-> (chỉ cần sửa `src/services/endpoints.ts`, `src/services/validators.ts` và `src/types/`).
+Backend hiện triển khai các endpoint dưới đây trong `backend/src/routes.ts`. Dữ liệu nghiệp vụ lưu trong PostgreSQL.
 
-## Quy ước chung (đề xuất)
+## Quy ước chung
 
-| Mục | Đề xuất | Vì sao |
-|---|---|---|
-| Base URL | `http://<host>:3000`, các API nghiệp vụ có tiền tố `/api` | Cổng 3000 lấy từ `backend/src/server.ts` |
-| Định dạng | JSON, tên trường **camelCase** | Trùng type frontend trong `src/types/` |
-| id | chuỗi (`"12"` hoặc UUID) | Frontend coi mọi id là `string` |
-| Ngày giờ | ISO 8601, ví dụ `"2026-10-09T08:00:00.000Z"` | |
-| Tiền | số nguyên VND | |
-| Xác thực | Header `Authorization: Bearer <token>` | Đã cài sẵn trong `apiClient.ts`, đổi 1 chỗ nếu khác |
-| Lỗi | HTTP status + body `{ "message": "...", "errors": { "field": "..." } }` | `apiError.ts` đọc `message` để hiện cho người dùng, `errors` để hiện dưới từng ô |
-| CORS | Bật cho bản web khi phát triển | Chỉ cần nếu chạy app trên trình duyệt |
+| Mục | Quy ước |
+|---|---|
+| Base URL | `http://<host>:3000`, có thể đổi bằng `PORT`; API nghiệp vụ có tiền tố `/api` |
+| Định dạng | JSON, tên trường camelCase |
+| ID | Chuỗi (UUID cho user, design và quote; ID danh mục/sản phẩm dạng chuỗi) |
+| Ngày giờ | ISO 8601 |
+| Tiền | Số nguyên VND |
+| Xác thực | `Authorization: Bearer <token>`; JWT hết hạn sau 7 ngày |
+| Lỗi | `{ "message": "...", "errors": { "field": "..." } }` khi có lỗi theo trường |
+| CORS | Cho phép các origin trong `CORS_ORIGINS` |
 
-Mã lỗi frontend đang xử lý riêng: `400/422` (dữ liệu sai), `401` (chưa đăng nhập/token hết hạn → app tự đăng xuất),
-`403`, `404`, `409` (trùng, ví dụ email đã đăng ký), `413` (ảnh quá lớn), `5xx`.
+Không có refresh token hoặc endpoint logout phía server; client xoá token khi đăng xuất. API sản phẩm và gửi yêu cầu báo giá không yêu cầu đăng nhập. API thiết kế yêu cầu JWT hợp lệ.
 
-## Đã có
+## Health
 
 | Method | Path | Response |
 |---|---|---|
-| GET | `/health` | `{ "status": "ok", "message": "Room Decor AI backend is running" }` |
+| GET | `/health` | `200 { "status": "ok", "message": "Room Decor AI backend is running" }`; truy vấn PostgreSQL để xác nhận backend sẵn sàng |
 
-## Đề xuất
-
-### Xác thực
+## Xác thực
 
 | Method | Path | Request | Response |
 |---|---|---|---|
-| POST | `/api/auth/register` | `{ name, email, password }` | `201 { token, user }` |
-| POST | `/api/auth/login` | `{ email, password }` | `200 { token, user }` · `401` sai email/mật khẩu |
-| GET | `/api/me` | (Bearer) | `200 user` · `401` |
+| POST | `/api/auth/register` | `{ name, email, password }` | `201 { token, user }`; `409` nếu email đã có |
+| POST | `/api/auth/login` | `{ email, password }` | `200 { token, user }`; `401` nếu thông tin sai |
+| GET | `/api/me` | Bearer token | `200 user`; `401` nếu phiên không hợp lệ |
 
-`user` = `{ id, name, email, avatarUrl? }`. Mật khẩu tối thiểu 6 ký tự (frontend đang kiểm tra như vậy).
-Cần hỏi: token loại gì, hết hạn sau bao lâu, có refresh token không, có cần `POST /api/auth/logout` không.
-Nếu tên trường khác (`accessToken`...), frontend chỉ sửa `isAuthSession` trong `validators.ts`.
+`user` = `{ id, name, email, avatarUrl? }`. Mật khẩu tối thiểu 6 ký tự và được băm bằng bcrypt. Email được chuẩn hoá chữ thường.
 
-### Danh mục & sản phẩm (không cần đăng nhập)
+## Danh mục và sản phẩm (không cần đăng nhập)
 
 | Method | Path | Query | Response |
 |---|---|---|---|
-| GET | `/api/categories` | | `[{ id, label }]` |
+| GET | `/api/categories` | — | `[{ id, label }]` |
 | GET | `/api/products` | `category?`, `ids?` (`a,b,c`), `featured?` (`true`) | `[Product]` |
-| GET | `/api/products/:id` | | `Product` · `404` |
+| GET | `/api/products/:id` | — | `Product`; `404` nếu không tồn tại |
 
-`Product` = `{ id, name, brand, price, unit, categoryId, categoryName?, imageUrl, rating, reviewCount, description, specs: [{label, value}], colors: [string], sizes: [string] }`.
-Icon danh mục do frontend chọn, backend không cần trả. Cần hỏi: có phân trang không (`page`, `limit`, tổng số).
+`Product` = `{ id, name, brand, price, unit, categoryId, categoryName, imageUrl, rating, reviewCount, description, specs: [{label, value}], colors: [string], sizes: [string] }`. Giá là số nguyên VND. Danh mục và 18 sản phẩm mẫu được seed idempotently khi server khởi động. Danh sách chưa phân trang; `ids` nhận tối đa 100 sản phẩm.
 
-### Thiết kế & lịch sử (cần đăng nhập)
+## Thiết kế và lịch sử (cần đăng nhập)
 
 | Method | Path | Request | Response |
 |---|---|---|---|
 | POST | `/api/designs` | multipart: `image` (file), `roomType`, `style`, `colorTheme?`, `prompt?` | `201 Design` |
-| GET | `/api/designs` | | `[Design]` (đã lưu, mới nhất trước) |
-| GET | `/api/designs/:id` | | `Design` |
-| POST | `/api/designs/:id/save` | | `204` |
-| DELETE | `/api/designs/:id` | | `204` |
-| POST / DELETE | `/api/designs/:id/favorite` | | `204` |
+| GET | `/api/designs` | — | `[Design]` đã lưu, mới nhất trước |
+| GET | `/api/designs/:id` | — | `Design` của người dùng hiện tại |
+| POST | `/api/designs/:id/save` | — | `204` |
+| DELETE | `/api/designs/:id` | — | `204` |
+| POST / DELETE | `/api/designs/:id/favorite` | — | `204` |
 
-`Design` = `{ id, createdAt, originalImageUri, resultImageUrl, roomType, style, colorTheme?, prompt?, status: "processing"|"done"|"failed", errorMessage?, products: [{ productId, usage }], isFavorite }`.
-`originalImageUri` phải là URL ảnh trên server (không phải đường dẫn file trong điện thoại).
-Giai đoạn này AI vẫn là ảnh minh họa phía backend. Cần hỏi: giới hạn dung lượng/định dạng ảnh; trả `done` ngay hay
-`processing` rồi frontend gọi lại `GET /api/designs/:id` (màn Result đã có nút "Kiểm tra lại").
+`Design` = `{ id, createdAt, originalImageUri, resultImageUrl, roomType, style, colorTheme?, prompt?, status, errorMessage?, products: [{ productId, usage }], isFavorite }`. Ảnh gốc được lưu trong `UPLOAD_DIR`; `originalImageUri` là URL ký số chỉ đọc được trong 30 ngày. Mặc định giới hạn upload 10 MiB, nhận JPEG/PNG/WebP/HEIC. Bản hiện tại trả `status: "done"` ngay và dùng ảnh minh hoạ cho kết quả; chưa tích hợp AI thật. Danh sách chỉ gồm thiết kế đã lưu, còn endpoint lấy theo ID cũng đọc được bản nháp của chính người dùng.
 
-### Báo giá
+## Báo giá (không cần đăng nhập)
 
 | Method | Path | Request | Response |
 |---|---|---|---|
-| POST | `/api/quote-requests` | `{ productId, customerName, phone, quantity, note? }` | `201` |
+| POST | `/api/quote-requests` | `{ productId, customerName, phone, quantity, note? }` | `201 { id, createdAt }` |
 
-`quantity` là số nguyên > 0, `phone` 10 số bắt đầu bằng 0 (frontend đang kiểm tra như vậy). Cần hỏi: có cần đăng nhập không.
+`quantity` là số nguyên dương; `phone` gồm 10 số và bắt đầu bằng `0`. `productId` phải tồn tại.
 
-### Sản phẩm yêu thích
+## Sản phẩm yêu thích
 
-Hiện **chỉ lưu trên máy**. Nếu backend muốn lưu theo tài khoản, đề xuất `GET /api/favorites/products`,
-`POST / DELETE /api/favorites/products/:productId`.
+Yêu thích sản phẩm hiện chỉ được lưu cục bộ bởi frontend; API chưa đồng bộ danh sách này. Yêu thích thiết kế được lưu trong PostgreSQL theo tài khoản.
+
+## Mã lỗi
+
+`400` dữ liệu không hợp lệ, `401` chưa xác thực, `404` không tìm thấy, `409` email trùng, `413` ảnh quá lớn, `415` định dạng ảnh không hỗ trợ, `500` lỗi server.
