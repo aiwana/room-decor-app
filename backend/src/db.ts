@@ -8,6 +8,12 @@ export const pool = new Pool({
   ...(config.PGSSL === "true" ? { ssl: true } : {}),
 });
 
+// Khi PostgreSQL khởi động lại, kết nối đang rảnh trong pool bị ngắt và pool phát sự kiện "error".
+// Không có listener thì Node coi là lỗi chưa xử lý và tắt cả server. Ghi log để pool tự tạo kết nối mới.
+pool.on("error", (error) => {
+  console.error("PostgreSQL pool error (idle client):", error.message);
+});
+
 const schema = `
   CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY,

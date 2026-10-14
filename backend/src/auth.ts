@@ -76,7 +76,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
 export const authenticate = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   const header = req.get("authorization");
-  const match = header?.match(/^Bearer\s+(.+)$/i);
+  const match = header?.match(/^Bearer\s+(\S+)$/i);
   const token = match?.[1];
   if (!token) {
     res.status(401).json({ message: "Vui lòng đăng nhập để tiếp tục." });

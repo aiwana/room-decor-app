@@ -13,6 +13,8 @@ import { pool } from "./db";
 import { productsByStyle } from "./seed";
 
 export const app = express();
+// Không tiết lộ "X-Powered-By: Express" cho client (SonarQube: Security).
+app.disable("x-powered-by");
 const uploads = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, callback) => {
