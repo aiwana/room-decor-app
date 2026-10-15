@@ -1,4 +1,4 @@
-# API contract — Đã triển khai
+# API contract (tài liệu tra cứu)
 
 Backend hiện triển khai các endpoint dưới đây trong `backend/src/routes.ts`. Dữ liệu nghiệp vụ lưu trong PostgreSQL.
 
@@ -6,7 +6,7 @@ Backend hiện triển khai các endpoint dưới đây trong `backend/src/route
 
 | Mục | Quy ước |
 |---|---|
-| Base URL | `http://<host>:3000`, có thể đổi bằng `PORT`; API nghiệp vụ có tiền tố `/api` |
+| Base URL | Backend Docker: `http://localhost:3001`. Backend `npm run dev`: `http://localhost:3000`. API nghiệp vụ có tiền tố `/api` |
 | Định dạng | JSON, tên trường camelCase |
 | ID | Chuỗi (UUID cho user, design và quote; ID danh mục/sản phẩm dạng chuỗi) |
 | Ngày giờ | ISO 8601 |

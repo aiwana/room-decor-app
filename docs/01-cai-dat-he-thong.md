@@ -1,4 +1,4 @@
-# Hướng dẫn cài đặt: Docker, SonarQube, Jenkins và backend Room Decor AI
+# Bước 1. Cài đặt hệ thống: Docker, PostgreSQL, backend, Jenkins, SonarQube
 
 Cập nhật: 15/10/2026. Áp dụng cho Windows 10/11 + PowerShell + Docker Desktop.
 
@@ -9,6 +9,7 @@ Tài liệu này giúp một thành viên mới dựng lại **đúng hệ thố
 - Jenkins + SonarQube (stack `cicd-portal`) với job `room-decor-ci`: typecheck, lint, quét SonarQube + Quality Gate, build Docker image backend.
 
 Làm lần lượt từ mục 1 tới mục 7. Mỗi bước có **kết quả mong đợi**; chỉ đi tiếp khi đã thấy đúng kết quả đó.
+Xong file này thì sang [Bước 2: chạy app mobile](./02-chay-app-mobile.md). Thứ tự đầy đủ xem ở [docs/README.md](./README.md).
 
 > **Quy tắc bảo mật xuyên suốt:** không gửi file `.env`, mật khẩu, `JWT_SECRET` hay token vào chat, ảnh chụp, hay commit lên GitHub. Mỗi người tự sinh secret riêng trên máy mình theo hướng dẫn.
 
@@ -57,7 +58,7 @@ Cần cài:
 | --- | --- |
 | **Docker Desktop** (backend WSL 2) | Mở lên, chờ góc dưới hiện *Engine running* |
 | **Git** | Để clone repo |
-| **Node.js 24 LTS** (tuỳ chọn) | Chỉ cần nếu muốn chạy backend bằng `npm run dev` hoặc chạy app Expo |
+| **Node.js 24 LTS** | Cần cho [Bước 2](./02-chay-app-mobile.md) (app Expo) và [Bước 3](./03-backend-chay-truc-tiep.md) (`npm run dev`). Chỉ dựng Docker/Jenkins thì chưa cần |
 
 Yêu cầu: RAM tối thiểu 8 GB (SonarQube khá nặng), còn trống khoảng 10 GB ổ đĩa, có Internet (tải image, plugin, tool).
 
@@ -411,13 +412,7 @@ curl.exe -s http://localhost:3001/health
 
 ### Chạy backend bằng `npm run dev` (khi đang sửa code)
 
-```powershell
-cd backend
-npm ci
-npm run dev
-```
-
-Bản dev chạy ở `http://localhost:3000` và dùng chung DB với bản Docker (qua `127.0.0.1:5433`). App Expo trên Android Emulator gọi `http://10.0.2.2:3000`.
+Xem [Bước 3: chạy backend trực tiếp](./03-backend-chay-truc-tiep.md). Bản dev chạy ở `http://localhost:3000` và dùng chung DB với bản Docker (qua `127.0.0.1:5433`).
 
 ---
 
@@ -428,7 +423,7 @@ Các lệnh này xoá dữ liệu không lấy lại được (job Jenkins, kế
 - `docker compose down -v`, `docker volume rm ...`, `docker volume prune`, `docker system prune`.
 - `docker rm` với `room-decor-postgres`, `portal-sonar-db`, `portal-sonarqube`, `portal-jenkins`. Muốn tắt tạm thì dùng `docker stop` hoặc `docker compose stop`.
 - Sửa cấu hình hay xoá `portal-sonar-db`: đó là DB riêng của SonarQube.
-- `git add .` trong repo: `backend/storage` (ảnh upload) chưa nằm trong `.gitignore`. Luôn `git add` đúng tên file.
+- `git add .` trong repo: dễ kéo theo file đang sửa dở (ví dụ `package.json`, `package-lock.json`) vào commit. Luôn `git add` đúng tên file. (Ảnh upload trong `backend/storage/uploads` đã nằm trong `.gitignore`.)
 - `npm audit fix` hoặc nâng hàng loạt thư viện.
 - Gửi `.env`, mật khẩu, `JWT_SECRET`, token SonarQube vào chat, ảnh chụp hay commit.
 

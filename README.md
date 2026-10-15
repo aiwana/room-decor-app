@@ -5,7 +5,9 @@ chụp hoặc chọn ảnh phòng → chọn loại phòng, phong cách, màu �
 Module phụ **Catalog vật liệu** cho phép xem sản phẩm được dùng trong thiết kế và gửi yêu cầu báo giá.
 
 Expo SDK 57 · React Native 0.86 · Expo Router · TypeScript strict.
-Giai đoạn hiện tại: **frontend dùng mock data** (chưa có backend / AI thật).
+Backend Express + PostgreSQL đã chạy thật (nhánh `backend-db`); phần AI vẫn là giả lập.
+
+**Thành viên mới:** cài đặt theo thứ tự trong [docs/README.md](./docs/README.md).
 
 ## Chạy dự án
 
@@ -16,18 +18,8 @@ npm run typecheck       # kiểm tra TypeScript (chỉ frontend, không quét ba
 npm run lint            # kiểm tra ESLint (chỉ frontend)
 ```
 
-Backend nằm trong `backend/` và có `package.json`, `tsconfig.json` riêng. Backend dùng PostgreSQL; trước khi chạy,
-tạo database `room_decor`, sao chép `backend/.env.example` thành `backend/.env`, rồi đặt `DATABASE_URL`
-và một giá trị bí mật ngẫu nhiên dài ít nhất 32 ký tự cho `JWT_SECRET`:
-
-Hướng dẫn tạo database và cấu hình PostgreSQL đầy đủ: [docs/backend-postgresql-setup.md](./docs/backend-postgresql-setup.md).
-
-```bash
-cd backend
-npm install
-npm run dev             # khởi tạo bảng + dữ liệu mẫu; http://localhost:3000/health
-npm run typecheck
-```
+Backend nằm trong `backend/` và có `package.json`, `tsconfig.json` riêng. Backend dùng PostgreSQL.
+Cách dựng PostgreSQL + backend (Docker hoặc `npm run dev`): xem [docs/README.md](./docs/README.md).
 
 Đặt `EXPO_PUBLIC_USE_MOCK=false` trong file `.env` tại gốc dự án để app gọi API thật.
 Đặt `EXPO_PUBLIC_API_URL` theo địa chỉ backend đang chạy (xem `.env.example`); khi dùng điện thoại thật,
@@ -81,13 +73,12 @@ src/
 Màn hình **không bao giờ** import thẳng `data/mock`. Mọi dữ liệu đi qua `src/services/`.
 Mỗi service có 2 bản cùng 1 interface: `mockXxxService` và `apiXxxService`, chọn theo `USE_MOCK`.
 
-- Đường dẫn API: chỉ ở `src/services/endpoints.ts`. Hiện backend **chỉ có** `GET /health`,
-  các đường dẫn khác là **đề xuất** (xem `docs/api-contract-de-xuat.md`).
+- Đường dẫn API: chỉ ở `src/services/endpoints.ts`. Danh sách endpoint backend: [docs/api-contract.md](./docs/api-contract.md).
 - Địa chỉ backend: chỉ ở `src/services/config.ts`, đổi bằng file `.env` (xem `.env.example`):
 
 | Chạy app ở đâu | `EXPO_PUBLIC_API_URL` |
 |---|---|
-| Android Emulator | `http://10.0.2.2:3000` (mặc định nếu bỏ trống) |
+| Android Emulator | `http://10.0.2.2:3000` (mặc định nếu bỏ trống). Backend chạy bằng Docker thì dùng cổng `3001` |
 | Web trên cùng máy | `http://localhost:3000` (mặc định nếu bỏ trống) |
 | Điện thoại thật (Expo Go) | `http://<IPv4 của máy tính>:3000`, lấy bằng `ipconfig`, cùng Wi-Fi |
 
