@@ -75,6 +75,18 @@ CREATE DATABASE room_decor OWNER roomdecor_app;
 
 Rồi sửa `DATABASE_URL` cho đúng host/port. Nếu mật khẩu có ký tự đặc biệt (`@ : / # %`), phải URL-encode trong `DATABASE_URL`. Dịch vụ cloud yêu cầu SSL thì đặt `PGSSL=true` và thêm `?sslmode=require`; không tắt xác minh chứng chỉ để lách lỗi.
 
+## Unit test và coverage
+
+Test nằm trong `backend/src/__tests__/`, dùng Jest + supertest gọi thẳng vào `app` trong `routes.ts`. PostgreSQL được giả lập (mock), nên **không cần database hay file `.env`** để chạy test; biến môi trường giả nằm trong `src/__tests__/helpers/env.ts`.
+
+```powershell
+cd backend
+npm test                 # chạy toàn bộ test
+npm run test:coverage    # kèm báo cáo coverage, mở backend\coverage\lcov-report\index.html để xem
+```
+
+Coverage dưới ngưỡng (lines/statements/functions 80%, branches 70%) thì lệnh báo lỗi. Thư mục `backend/coverage/` là file sinh ra, không commit.
+
 ---
 
 ## Lỗi thường gặp
