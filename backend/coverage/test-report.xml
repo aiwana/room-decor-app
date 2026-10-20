@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="86" failures="0" errors="0" time="1.329">
+  <testsuite name="GET /api/products" errors="0" failures="0" skipped="0" timestamp="2026-10-19T17:09:11" time="0.558" tests="10">
+    <testcase classname="GET /api/products" name="trả về mảng rỗng khi chưa có sản phẩm" time="0.025">
+    </testcase>
+    <testcase classname="GET /api/products" name="trả về danh sách sau khi tạo sản phẩm" time="0.022">
+    </testcase>
+    <testcase classname="POST /api/products" name="tạo sản phẩm thành công — trả về 201 với id" time="0.003">
+    </testcase>
+    <testcase classname="POST /api/products" name="trả về 422 khi thiếu name" time="0.003">
+    </testcase>
+    <testcase classname="POST /api/products" name="trả về 422 khi price âm" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/products" name="trả về 422 khi imageUrl không phải URL" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/products" name="trả về 422 khi body rỗng" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/products" name="specs/colors/sizes mặc định là mảng rỗng nếu không gửi" time="0.003">
+    </testcase>
+    <testcase classname="GET /api/products/:id" name="trả về sản phẩm khi id tồn tại" time="0.004">
+    </testcase>
+    <testcase classname="GET /api/products/:id" name="trả về 404 khi id không tồn tại" time="0.002">
+    </testcase>
+  </testsuite>
+  <testsuite name="isValidEmail" errors="0" failures="0" skipped="0" timestamp="2026-10-19T17:09:12" time="0.062" tests="33">
+    <testcase classname="isValidEmail" name="chấp nhận email hợp lệ: user@example.com" time="0">
+    </testcase>
+    <testcase classname="isValidEmail" name="chấp nhận email hợp lệ: name.surname@domain.org" time="0">
+    </testcase>
+    <testcase classname="isValidEmail" name="chấp nhận email hợp lệ: user+tag@sub.domain.vn" time="0">
+    </testcase>
+    <testcase classname="isValidEmail" name="chấp nhận email hợp lệ: 123@numbers.io" time="0.001">
+    </testcase>
+    <testcase classname="isValidEmail" name="từ chối email không hợp lệ: " time="0">
+    </testcase>
+    <testcase classname="isValidEmail" name="từ chối email không hợp lệ: plainaddress" time="0">
+    </testcase>
+    <testcase classname="isValidEmail" name="từ chối email không hợp lệ: @no-local.com" time="0">
+    </testcase>
+    <testcase classname="isValidEmail" name="từ chối email không hợp lệ: no-at-sign" time="0">
+    </testcase>
+    <testcase classname="isValidEmail" name="từ chối email không hợp lệ: two@@at.com" time="0">
+    </testcase>
+    <testcase classname="isValidEmail" name="từ chối email không hợp lệ: space @domain.com" time="0">
+    </testcase>
+    <testcase classname="isValidEmail" name="từ chối email không hợp lệ: domain.com" time="0">
+    </testcase>
+    <testcase classname="isUser" name="true cho object đúng cấu trúc" time="0">
+    </testcase>
+    <testcase classname="isUser" name="false khi thiếu id" time="0">
+    </testcase>
+    <testcase classname="isUser" name="false khi thiếu name" time="0">
+    </testcase>
+    <testcase classname="isUser" name="false khi thiếu email" time="0">
+    </testcase>
+    <testcase classname="isUser" name="false cho null" time="0.001">
+    </testcase>
+    <testcase classname="isUser" name="false cho string" time="0">
+    </testcase>
+    <testcase classname="isAuthSession" name="true cho session hợp lệ" time="0">
+    </testcase>
+    <testcase classname="isAuthSession" name="false khi token rỗng" time="0">
+    </testcase>
+    <testcase classname="isAuthSession" name="false khi user sai cấu trúc" time="0">
+    </testcase>
+    <testcase classname="isAuthSession" name="false khi thiếu user" time="0">
+    </testcase>
+    <testcase classname="isProduct" name="true cho product hợp lệ" time="0">
+    </testcase>
+    <testcase classname="isProduct" name="false khi price là string" time="0.001">
+    </testcase>
+    <testcase classname="isProduct" name="false khi price là Infinity" time="0">
+    </testcase>
+    <testcase classname="isProduct" name="false khi specs không phải mảng" time="0">
+    </testcase>
+    <testcase classname="isProduct" name="false khi thiếu imageUrl" time="0">
+    </testcase>
+    <testcase classname="isDesign" name="true cho design hợp lệ (done)" time="0">
+    </testcase>
+    <testcase classname="isDesign" name="true cho design với status processing" time="0">
+    </testcase>
+    <testcase classname="isDesign" name="true cho design với status failed" time="0">
+    </testcase>
+    <testcase classname="isDesign" name="false khi status không hợp lệ" time="0">
+    </testcase>
+    <testcase classname="isDesign" name="false khi isFavorite không phải boolean" time="0">
+    </testcase>
+    <testcase classname="isDesign" name="false khi products không phải mảng" time="0">
+    </testcase>
+    <testcase classname="isDesign" name="false khi thiếu id" time="0.001">
+    </testcase>
+  </testsuite>
+  <testsuite name="POST /api/auth/register" errors="0" failures="0" skipped="0" timestamp="2026-10-19T17:09:12" time="0.133" tests="13">
+    <testcase classname="POST /api/auth/register" name="đăng ký thành công — trả về 201 với token và user" time="0.007">
+    </testcase>
+    <testcase classname="POST /api/auth/register" name="trả về 409 khi email đã tồn tại" time="0.004">
+    </testcase>
+    <testcase classname="POST /api/auth/register" name="trả về 422 khi thiếu name" time="0.003">
+    </testcase>
+    <testcase classname="POST /api/auth/register" name="trả về 422 khi email sai định dạng" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/auth/register" name="trả về 422 khi mật khẩu quá ngắn (&lt; 6 ký tự)" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/auth/register" name="trả về 422 khi name quá ngắn (&lt; 2 ký tự)" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/auth/register" name="trả về 422 khi body rỗng" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/auth/login" name="đăng nhập thành công — trả về 200 với token và user" time="0.004">
+    </testcase>
+    <testcase classname="POST /api/auth/login" name="trả về 401 khi mật khẩu sai" time="0.004">
+    </testcase>
+    <testcase classname="POST /api/auth/login" name="trả về 401 khi email không tồn tại" time="0.003">
+    </testcase>
+    <testcase classname="POST /api/auth/login" name="trả về 422 khi thiếu email" time="0.004">
+    </testcase>
+    <testcase classname="POST /api/auth/login" name="trả về 422 khi thiếu password" time="0.004">
+    </testcase>
+    <testcase classname="POST /api/auth/login" name="trả về 422 khi email sai định dạng" time="0.005">
+    </testcase>
+  </testsuite>
+  <testsuite name="GET /api/designs" errors="0" failures="0" skipped="0" timestamp="2026-10-19T17:09:12" time="0.173" tests="19">
+    <testcase classname="GET /api/designs" name="trả về mảng rỗng khi chưa có thiết kế" time="0.003">
+    </testcase>
+    <testcase classname="GET /api/designs" name="trả về danh sách sắp xếp mới nhất trước" time="0.016">
+    </testcase>
+    <testcase classname="POST /api/designs" name="tạo thiết kế thành công — trả về 201 với id và isFavorite=false" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/designs" name="trả về 422 khi thiếu roomType" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/designs" name="trả về 422 khi thiếu style" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/designs" name="status mặc định là &apos;done&apos; nếu không gửi" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/designs" name="products mặc định là mảng rỗng nếu không gửi" time="0.003">
+    </testcase>
+    <testcase classname="POST /api/designs" name="chấp nhận status = &apos;processing&apos;" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/designs" name="trả về 422 khi status không hợp lệ" time="0.002">
+    </testcase>
+    <testcase classname="GET /api/designs/:id" name="trả về thiết kế khi id tồn tại" time="0.004">
+    </testcase>
+    <testcase classname="GET /api/designs/:id" name="trả về 404 khi id không tồn tại" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/designs/:id/save" name="đánh dấu isSaved = true" time="0.006">
+    </testcase>
+    <testcase classname="POST /api/designs/:id/save" name="trả về 404 khi id không tồn tại" time="0.002">
+    </testcase>
+    <testcase classname="favorite toggle" name="POST /favorite → isFavorite = true" time="0.005">
+    </testcase>
+    <testcase classname="favorite toggle" name="DELETE /favorite → isFavorite = false" time="0.006">
+    </testcase>
+    <testcase classname="favorite toggle" name="POST /favorite trả về 404 khi id không tồn tại" time="0.002">
+    </testcase>
+    <testcase classname="favorite toggle" name="DELETE /favorite trả về 404 khi id không tồn tại" time="0.002">
+    </testcase>
+    <testcase classname="DELETE /api/designs/:id" name="xóa thiết kế thành công — trả về 204" time="0.005">
+    </testcase>
+    <testcase classname="DELETE /api/designs/:id" name="trả về 404 khi id không tồn tại" time="0.002">
+    </testcase>
+  </testsuite>
+  <testsuite name="POST /api/quote-requests" errors="0" failures="0" skipped="0" timestamp="2026-10-19T17:09:12" time="0.114" tests="10">
+    <testcase classname="POST /api/quote-requests" name="gửi báo giá thành công — trả về 201 với id" time="0.012">
+    </testcase>
+    <testcase classname="POST /api/quote-requests" name="chấp nhận yêu cầu không có email và designId (tuỳ chọn)" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/quote-requests" name="trả về 422 khi thiếu name" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/quote-requests" name="trả về 422 khi thiếu phone" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/quote-requests" name="trả về 422 khi name quá ngắn (&lt; 2 ký tự)" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/quote-requests" name="trả về 422 khi phone quá ngắn (&lt; 9 ký tự)" time="0.003">
+    </testcase>
+    <testcase classname="POST /api/quote-requests" name="trả về 422 khi email không đúng định dạng" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/quote-requests" name="trả về 422 khi body rỗng" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/quote-requests" name="lưu dữ liệu vào store sau khi tạo thành công" time="0.002">
+    </testcase>
+    <testcase classname="POST /api/quote-requests" name="nhiều yêu cầu có id khác nhau" time="0.003">
+    </testcase>
+  </testsuite>
+  <testsuite name="GET /health" errors="0" failures="0" skipped="0" timestamp="2026-10-19T17:09:12" time="0.078" tests="1">
+    <testcase classname="GET /health" name="trả về 200 với status ok" time="0.003">
+    </testcase>
+  </testsuite>
+</testsuites>

@@ -1,0 +1,125 @@
+/**
+ * Jenkinsfile — Room Decor AI Backend
+ *
+ * Pipeline CI gồm 4 stage:
+ *   1. Install    — cài dependencies
+ *   2. Typecheck  — kiểm tra TypeScript
+ *   3. Test       — chạy Jest + sinh coverage
+ *   4. SonarQube  — phân tích chất lượng code & upload coverage
+ *
+ * Yêu cầu Jenkins:
+ *   - Plugin: NodeJS, SonarQube Scanner, Pipeline
+ *   - NodeJS tool tên "NodeJS-20" đã cài trong Global Tool Configuration
+ *   - SonarQube server tên "SonarQube" đã cài trong Manage Jenkins > Configure System
+ *   - Credential ID "sonar-token" chứa SonarQube token
+ */
+pipeline {
+    agent any
+
+    tools {
+        nodejs 'NodeJS-20'
+    }
+
+    environment {
+        // Thư mục làm việc là backend/
+        WORKING_DIR = 'backend'
+        // Bỏ màu ANSI trong log Jenkins cho dễ đọc
+        FORCE_COLOR = '0'
+    }
+
+    options {
+        timeout(time: 15, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                dir(WORKING_DIR) {
+                    sh 'npm ci'
+                }
+            }
+        }
+
+        stage('Typecheck') {
+            steps {
+                dir(WORKING_DIR) {
+                    sh 'npm run typecheck'
+                }
+            }
+        }
+
+        stage('Unit Tests + Coverage') {
+            steps {
+                dir(WORKING_DIR) {
+                    sh 'npm run test:ci'
+                }
+            }
+            post {
+                always {
+                    // Publish JUnit-compatible XML (jest-sonar-reporter)
+                    junit allowEmptyResults: true,
+                          testResults: "${WORKING_DIR}/coverage/test-report.xml"
+
+                    // Publish HTML coverage report
+                    publishHTML(target: [
+                        allowMissing         : false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll              : true,
+                        reportDir            : "${WORKING_DIR}/coverage/lcov-report",
+                        reportFiles          : 'index.html',
+                        reportName           : 'Coverage Report'
+                    ])
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    dir(WORKING_DIR) {
+                        sh """
+                            npx sonar-scanner \
+                              -Dsonar.projectKey=room-decor-backend \
+                              -Dsonar.projectName="Room Decor Backend" \
+                              -Dsonar.sources=src \
+                              -Dsonar.exclusions=src/__tests__/** \
+                              -Dsonar.tests=src/__tests__ \
+                              -Dsonar.testExecutionReportPaths=coverage/test-report.xml \
+                              -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                              -Dsonar.typescript.tsconfigPath=tsconfig.json
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                // Chờ SonarQube phân tích xong; fail pipeline nếu không đạt ngưỡng
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ Pipeline thành công — tất cả test pass và quality gate đạt.'
+        }
+        failure {
+            echo '❌ Pipeline thất bại — kiểm tra log bên trên.'
+        }
+        always {
+            cleanWs()
+        }
+    }
+}
