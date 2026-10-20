@@ -47,3 +47,6 @@ backend/storage/uploads/
 
 # IDE
 .idea/
+
+# Test coverage: Jenkins tự sinh, không commit
+backend/coverage/
