@@ -3,18 +3,17 @@
  * "Cong" duy nhat de tao thiet ke bang AI. Man hinh CHI goi generateDesign(),
  * khong can biet ben trong la mock hay backend.
  *
- * Giai doan nay KHONG tich hop AI tao anh that:
- *   - Mock: tra anh minh hoa ngau nhien (picsum) sau 2,5 giay.
- *   - API : gui anh len backend (endpoint DE XUAT). Backend tu quyet dinh
- *           dung AI that hay anh minh hoa.
+ * API bat dong bo: POST /api/designs tra 202 {status:'processing'} →
+ * polling GET /api/designs/:id den khi done/failed. Man hinh khong doi
+ * toc do AI ben trong service — GeneratingOverlay van hien tuong tu mock.
  */
 import { PRODUCTS_BY_STYLE } from '@/data/mock/productsByStyle';
-import type { Design, GenerateDesignInput } from '@/types';
 import { createId, delay } from '@/utils/format';
 
 import { request } from './apiClient';
-import { AI_TIMEOUT_MS, MOCK_AI_DELAY_MS, MOCK_AI_FAIL_RATE, USE_MOCK } from './config';
+import { AI_TIMEOUT_MS, API_TIMEOUT_MS, MOCK_AI_DELAY_MS, MOCK_AI_FAIL_RATE, USE_MOCK } from './config';
 import { ENDPOINTS } from './endpoints';
+import type { Design, GenerateDesignInput } from '@/types';
 import { isDesign } from './validators';
 
 export interface AiService {
@@ -62,7 +61,7 @@ const guessImageFile = (uri: string): { name: string; type: string } => {
  * Tra ve 1 Design (status co the la 'processing' neu backend xu ly lau).
  */
 const apiAiService: AiService = {
-  generateDesign(input) {
+  async generateDesign(input) {
     const form = new FormData();
     // React Native cho phep append file bang { uri, name, type }
     form.append('image', { uri: input.imageUri, ...guessImageFile(input.imageUri) } as unknown as Blob);
@@ -72,8 +71,39 @@ const apiAiService: AiService = {
     if (input.prompt) form.append('prompt', input.prompt);
 
     // Khong tu dat header Content-Type: de thu vien tu them "boundary" cho multipart
-    return request({ method: 'POST', url: ENDPOINTS.DESIGNS, data: form, timeout: AI_TIMEOUT_MS }, isDesign);
+    const submitted = await request(
+      { method: 'POST', url: ENDPOINTS.DESIGNS, data: form, timeout: AI_TIMEOUT_MS },
+      isDesign,
+    );
+
+    // Backend xu ly BAT DONG BO: status='processing' → polling GET /api/designs/:id
+    if (submitted.status !== 'processing') return submitted;
+    return pollUntilFinished(submitted.id);
   },
+};
+
+/** Poll dinh ky den khi design chuyen sang done/failed, hoac het thoi gian cho */
+const POLL_INTERVAL_MS = 3000;
+const POLL_MAX_TOTAL_MS = AI_TIMEOUT_MS + 4 * 60_000; // cho phep AI cham hon request upload
+
+const pollUntilFinished = async (designId: string): Promise<Design> => {
+  const deadline = Date.now() + POLL_MAX_TOTAL_MS;
+  for (;;) {
+    await delay(POLL_INTERVAL_MS);
+    if (Date.now() > deadline) {
+      throw new Error('Thời gian tạo quá lâu, vui lòng xem lại trong Lịch sử hoặc thử lại.');
+    }
+    // request() ném ApiError khi 401/404/500... — màn hình sẽ hiện lỗi tiếng Việt
+    const design = await request(
+      { method: 'GET', url: ENDPOINTS.design(designId), timeout: API_TIMEOUT_MS },
+      isDesign,
+    );
+    if (design.status === 'processing') continue;
+    if (design.status === 'failed') {
+      throw new Error(design.errorMessage ?? 'Không tạo được ảnh thiết kế, vui lòng thử lại.');
+    }
+    return design;
+  }
 };
 
 export const aiService: AiService = USE_MOCK ? mockAiService : apiAiService;

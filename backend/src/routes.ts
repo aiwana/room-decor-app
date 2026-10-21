@@ -11,8 +11,17 @@ import { authenticate, getCurrentUser, login, register, type AuthenticatedReques
 import { config } from "./config";
 import { pool } from "./db";
 import { productsByStyle } from "./seed";
+import { usageLogSchema } from "./usageLog";
+import { makeUsageLogger } from "./usageLog";
+import { DesignWorker, type DesignJob } from "./ai/worker";
+import { pollinationsProvider } from "./ai/pollinationsProvider";
+import { buildInteriorPrompt } from "./ai/promptBuilder";
 
 export const app = express();
+
+// Worker AI bat dong bo — chi khoi tao 1 lan khi module load
+const usageLogger = makeUsageLogger(pool);
+const aiWorker = new DesignWorker(pollinationsProvider);
 // Không tiết lộ "X-Powered-By: Express" cho client (SonarQube: Security).
 app.disable("x-powered-by");
 const uploads = multer({
@@ -242,20 +251,26 @@ app.post("/api/designs", authenticate, uploads.single("image"), async (req, res)
   const id = randomUUID();
   const suggestedProducts = productsByStyle[input.style];
   if (!suggestedProducts) throw new Error(`No product suggestions configured for style: ${input.style}`);
+
+  // Prompt chuan hoa cho AI (promptBuilder — phan prompt engineering cua do an)
+  const interiorPrompt = buildInteriorPrompt(input);
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    // status='processing': AI chua tra ket qua. result_image_url tam de trong (URL rong),
+    // worker se cap nhat khi co anh that.
     await client.query(
       `INSERT INTO designs
         (id, user_id, original_image_path, original_image_type, result_image_url, room_type, style,
          color_theme, prompt, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'done')`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'processing')`,
       [
         id,
         requireUser(req),
         req.file.filename,
         req.file.mimetype,
-        `https://picsum.photos/seed/${id}/800/600`,
+        "",
         input.roomType,
         input.style,
         input.colorTheme ?? null,
@@ -276,8 +291,34 @@ app.post("/api/designs", authenticate, uploads.single("image"), async (req, res)
   } finally {
     client.release();
   }
+
+  // Nem tac vu AI vao worker — khong cho ket noi de user nhan 202 ngay.
+  const job: DesignJob = {
+    designId: id,
+    originalPath: req.file.filename,
+    prompt: interiorPrompt,
+    userId: requireUser(req),
+    update: async (patch) => {
+      if (patch.status === "done" && patch.resultImagePath) {
+        const url = signedImageUrl(req, patch.resultImagePath);
+        await pool.query(
+          "UPDATE designs SET result_image_url = $1, status = 'done', error_message = NULL WHERE id = $2",
+          [url, id],
+        );
+      } else if (patch.status === "failed") {
+        await pool.query(
+          "UPDATE designs SET status = 'failed', error_message = $1 WHERE id = $2",
+          [patch.errorMessage ?? "Không tạo được ảnh thiết kế.", id],
+        );
+      }
+    },
+    logUsage: usageLogger,
+  };
+  aiWorker.enqueue(job);
+
+  // 202 Accepted: client co the polling GET /api/designs/:id de biet khi nao done/failed
   const result = await pool.query(`${selectDesigns} WHERE d.id = $1 GROUP BY d.id`, [id]);
-  res.status(201).json(toDesign(req, result.rows[0]));
+  res.status(202).json(toDesign(req, result.rows[0]));
 });
 
 app.get("/api/designs", authenticate, async (req, res) => {
@@ -406,15 +447,19 @@ app.get("/api/media/:filename", async (req, res) => {
     errorResponse(res, 403, "Liên kết ảnh không hợp lệ hoặc đã hết hạn.");
     return;
   }
+  // Tim anh trong 2 loai: anh goc nguoi dung upload, hoac anh AI ket qua da luu
   const result = await pool.query(
-    "SELECT original_image_type FROM designs WHERE original_image_path = $1",
+    `SELECT original_image_type AS mime, 0 AS pri FROM designs WHERE original_image_path = $1
+     UNION ALL
+     SELECT 'image/jpeg' AS mime, 1 AS pri FROM designs WHERE result_image_url LIKE '%' || $1 || '%'
+     ORDER BY pri LIMIT 1`,
     [filename],
   );
   if (!result.rows[0]) {
     errorResponse(res, 404, "Không tìm thấy ảnh.");
     return;
   }
-  res.type(result.rows[0].original_image_type);
+  res.type(result.rows[0].mime);
   const stream = createReadStream(path.join(config.UPLOAD_DIR, filename));
   stream.on("error", (error) => {
     console.error("Failed to read uploaded design image", error);

@@ -11,6 +11,18 @@ const envSchema = z.object({
   UPLOAD_DIR: z.string().default(path.resolve(process.cwd(), "storage", "uploads")),
   MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024),
   PGSSL: z.enum(["true", "false"]).default("false"),
+  // --- AI ---
+  AI_PROVIDER: z.enum(["pollinations"]).default("pollinations"),
+  AI_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
+  /** Thoi gian toi da 1 job AI duoc phep retry trong nen (bao gom cho slot 45s/ip) */
+  MAX_AI_JOB_WAIT_MS: z.coerce.number().int().positive().default(5 * 60_000),
+  /** So lan toi da 1 job duoc thu lai khi provider bi rate-limit */
+  AI_MAX_RETRIES: z.coerce.number().int().positive().default(4),
+}).superRefine((value, ctx) => {
+  // Provider can key (gemini...) thi bat buoc co AI_API_KEY — Pollinations thi khong can.
+  if (value.AI_PROVIDER !== "pollinations" && !process.env.AI_API_KEY) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["AI_API_KEY"], message: "AI_API_KEY is required for the selected AI_PROVIDER" });
+  }
 });
 
 const parsed = envSchema.safeParse(process.env);

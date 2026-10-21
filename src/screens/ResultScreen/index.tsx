@@ -4,7 +4,7 @@
  * va "Vat lieu duoc su dung" -> noi sang module Catalog.
  * URL: /result/[id]
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Share, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -26,6 +26,31 @@ import { showError } from '@/utils/alert';
 import { firstParam, formatDate } from '@/utils/format';
 
 import styles from './styles';
+
+/** Khung "AI đang xử lý" — polling tự động 4s/lần qua refreshDesign */
+const ProcessingView: React.FC<{ onRefresh: () => Promise<void>; refreshing: boolean }> = ({ onRefresh, refreshing }) => {
+  useEffect(() => {
+    const timer = setInterval(() => void onRefresh(), 4000);
+    return (): void => {
+      clearInterval(timer);
+    };
+  }, [onRefresh]);
+
+  return (
+    <View style={styles.processing}>
+      <ActivityIndicator size="large" color={COLORS.accent} />
+      <Text style={styles.processingText}>AI đang thiết kế lại phòng của bạn...</Text>
+      <Text style={styles.processingSub}>Thường mất khoảng 10–15 giây, đừng thoát app nhé</Text>
+      <Button
+        title="Kiểm tra lại"
+        iconName="refresh"
+        variant="ghost"
+        onPress={(): void => void onRefresh()}
+        loading={refreshing}
+      />
+    </View>
+  );
+};
 
 const ResultScreen: React.FC = () => {
   const router = useRouter();
@@ -131,17 +156,7 @@ const ResultScreen: React.FC = () => {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.scrollContent}>
       {design.status === 'processing' ? (
-        <View style={styles.processing}>
-          <ActivityIndicator size="large" color={COLORS.accent} />
-          <Text style={styles.processingText}>AI đang xử lý thiết kế...</Text>
-          <Button
-            title="Kiểm tra lại"
-            iconName="refresh"
-            variant="ghost"
-            onPress={(): void => void handleRefresh()}
-            loading={refreshing}
-          />
-        </View>
+        <ProcessingView onRefresh={handleRefresh} refreshing={refreshing} />
       ) : (
         <BeforeAfterView beforeUri={design.originalImageUri} afterUri={design.resultImageUrl} />
       )}

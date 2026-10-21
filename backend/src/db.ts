@@ -2,6 +2,7 @@ import { Pool } from "pg";
 
 import { config } from "./config";
 import { categories, products } from "./seed";
+import { usageLogSchema } from "./usageLog";
 
 export const pool = new Pool({
   connectionString: config.DATABASE_URL,
@@ -15,6 +16,7 @@ pool.on("error", (error) => {
 });
 
 const schema = `
+  ${usageLogSchema}
   CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY,
     name TEXT NOT NULL,

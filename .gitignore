@@ -41,6 +41,10 @@ example
 backend/dist/
 backend/storage/uploads/
 
+# npm cache bi sandbox chan, tao trong du an khi install
+.npm-cache/
+backend/.npm-cache/
+
 # generated native folders
 /ios
 /android
