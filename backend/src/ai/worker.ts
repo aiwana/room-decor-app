@@ -78,10 +78,12 @@ export class DesignWorker {
       } catch (error) {
         // process() đã tự xử lý thất bại; đây chỉ là lưới an toàn
         console.error("[ai-worker] unexpected failure", error);
-        await job.update({
-          status: "failed",
-          errorMessage: "Máy chủ AI gặp lỗi không xác định, vui lòng thử lại.",
-        }).catch(() => undefined);
+        await Promise.resolve(
+          job.update({
+            status: "failed",
+            errorMessage: "Máy chủ AI gặp lỗi không xác định, vui lòng thử lại.",
+          }),
+        ).catch(() => undefined);
       }
     }
     this.running = false;

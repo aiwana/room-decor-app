@@ -29,7 +29,8 @@ beforeEach(() => {
 describe("GET /api/media/:filename", () => {
   it("trả ảnh với đúng Content-Type khi chữ ký hợp lệ", async () => {
     writeFileSync(path.join(uploadDir, filename), "noi-dung-anh");
-    db.query.mockResolvedValueOnce(result([{ original_image_type: "image/png" }]));
+    // Query media tra { mime, pri } (gop anh goc + anh AI ket qua; pri de uu tien anh goc)
+    db.query.mockResolvedValueOnce(result([{ mime: "image/png", pri: 0 }]));
     const expires = future();
 
     const res = await request(app).get(mediaUrl(filename, expires, sign(filename, expires)));
@@ -92,7 +93,7 @@ describe("GET /api/media/:filename", () => {
   it("trả 404 khi database có nhưng file trên đĩa đã mất", async () => {
     const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const missing = "88888888-8888-4888-8888-888888888888.jpg";
-    db.query.mockResolvedValueOnce(result([{ original_image_type: "image/jpeg" }]));
+    db.query.mockResolvedValueOnce(result([{ mime: "image/jpeg", pri: 0 }]));
     const expires = future();
 
     const res = await request(app).get(mediaUrl(missing, expires, sign(missing, expires)));

@@ -32,12 +32,13 @@ export const usageLogSchema = `
 
 export const makeUsageLogger = (pool: Pool) => {
   return (entry: UsageEntry): void => {
-    void pool
-      .query(
+    // Promise.resolve(): log lỗi không bao giờ được làm rơi job (kể cả khi query mock trả undefined trong unit test)
+    void Promise.resolve(
+      pool.query(
         `INSERT INTO ai_usage_log (user_id, design_id, provider, attempt, latency_ms, outcome, detail)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [entry.userId, entry.designId, entry.provider, entry.attempt, entry.latencyMs, entry.outcome, entry.detail ?? null],
-      )
-      .catch((error: unknown) => console.error("usage log failed", error));
+      ),
+    ).catch((error: unknown) => console.error("usage log failed", error));
   };
 };

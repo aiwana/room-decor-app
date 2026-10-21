@@ -33,6 +33,16 @@ const designDbRow = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
+// Khong cho worker AI that chay trong unit test (se goi Pollinations that + retry 40s
+// gay ra log "Cannot log after tests are done"). Thay bang worker gia: enqueue = khong lam gi.
+jest.mock("../ai/worker", () => ({
+  DesignWorker: class {
+    enqueue(): void {
+      /* no-op trong test */
+    }
+  },
+}));
+
 const uploadedFiles = (): string[] => readdirSync(uploadDir);
 
 /** routes.ts trả 400 trước rồi mới xoá file, nên đợi tối đa 1 giây cho thư mục về đúng số file. */
@@ -66,9 +76,13 @@ describe("Các route thiết kế yêu cầu đăng nhập", () => {
 });
 
 describe("POST /api/designs", () => {
-  it("tạo thiết kế trong một transaction và trả 201", async () => {
+  /** Row mo cua thiet ke vua tao: AI con dang chay nen status='processing' (async 202). */
+  const processingDbRow = (extra: Record<string, unknown> = {}) =>
+    designDbRow({ status: "processing", error_message: null, result_image_url: "", ...extra });
+
+  it("tạo thiết kế, nem job AI và trả 202 processing", async () => {
     db.client.query.mockResolvedValue(result([]));
-    db.query.mockResolvedValueOnce(result([designDbRow({ color_theme: "beige", prompt: "ấm áp" })]));
+    db.query.mockResolvedValueOnce(result([processingDbRow({ color_theme: "beige", prompt: "ấm áp" })]));
 
     const res = await request(app)
       .post("/api/designs")
@@ -79,7 +93,8 @@ describe("POST /api/designs", () => {
       .field("prompt", "ấm áp")
       .attach("image", png, { filename: "phong.png", contentType: "image/png" });
 
-    expect(res.status).toBe(201);
+    // Async AI: route tra 202 Accepted, ket qua den sau qua polling
+    expect(res.status).toBe(202);
     expect(res.body).toMatchObject({
       id: DESIGN_ID,
       createdAt: "2026-10-20T03:00:00.000Z",
@@ -87,13 +102,10 @@ describe("POST /api/designs", () => {
       style: "modern",
       colorTheme: "beige",
       prompt: "ấm áp",
-      status: "done",
+      status: "processing",
       isFavorite: false,
     });
-    // Ảnh gốc trả về qua link có chữ ký, không lộ đường dẫn file
-    expect(res.body.originalImageUri).toMatch(
-      /^http:\/\/api\.test\/api\/media\/33333333-3333-4333-8333-333333333333\.png\?expires=\d+&signature=[0-9a-f]{64}$/,
-    );
+    expect(res.body.resultImageUrl).toBe(""); // anh AI chua co
 
     const sqls = db.client.query.mock.calls.map((call) => String(call[0]));
     expect(sqls[0]).toBe("BEGIN");
@@ -104,7 +116,7 @@ describe("POST /api/designs", () => {
 
   it("bỏ trống colorTheme/prompt thì lưu null", async () => {
     db.client.query.mockResolvedValue(result([]));
-    db.query.mockResolvedValueOnce(result([designDbRow()]));
+    db.query.mockResolvedValueOnce(result([processingDbRow()]));
 
     const res = await request(app)
       .post("/api/designs")
@@ -113,7 +125,7 @@ describe("POST /api/designs", () => {
       .field("style", "japandi")
       .attach("image", png, { filename: "a.jpg", contentType: "image/jpeg" });
 
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(202);
     expect(res.body.colorTheme).toBeUndefined();
     const insert = db.client.query.mock.calls[1] as [string, unknown[]];
     expect(insert[1].slice(7)).toEqual([null, null]);
