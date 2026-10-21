@@ -15,7 +15,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING.md,
   },
-  processingText: { color: COLORS.textSecondary },
+  processingText: { color: COLORS.textSecondary, fontSize: 16 },
+  processingSub: { color: COLORS.textSecondary, fontSize: 12, opacity: 0.8 },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
