@@ -9,7 +9,6 @@
  */
 import { config } from "../config";
 import {
-  type GeneratedImage,
   type ImageProvider,
   ProviderError,
 } from "./aiProvider";
@@ -20,7 +19,15 @@ const IMAGE_URL = "https://image.pollinations.ai/prompt";
 const WIDTH = 768;
 const HEIGHT = 576;
 
-const RETRYABLE_STATUS = new Set([402, 429, 500, 502, 503]);
+const RETRYABLE_STATUS = new Set([402, 429, 500, 502, 503, 504]);
+
+/** Detect the actual file format; an HTML error page must never become a design. */
+function imageMimeType(data: Buffer): string | undefined {
+  if (data.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return "image/png";
+  if (data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) return "image/jpeg";
+  if (data.toString("ascii", 0, 4) === "RIFF" && data.toString("ascii", 8, 12) === "WEBP") return "image/webp";
+  return undefined;
+}
 
 /**
  * Tu-phep lap lich: Pollinations de gioi han THEO KHOANG CACH GIUA CAC LAN GOI
@@ -64,13 +71,15 @@ export const pollinationsProvider: ImageProvider = {
         `?width=${WIDTH}&height=${HEIGHT}&nologo=true&seed=${seed}`;
 
       const t0 = Date.now();
+      let buffer: Buffer;
       try {
         res = await fetch(url, { signal: AbortSignal.timeout(config.AI_HTTP_TIMEOUT_MS) });
+        // The body can time out after fetch has already received the headers.
+        buffer = Buffer.from(await res.arrayBuffer());
       } catch (error) {
         throw new ProviderError("Khong ket noi duoc dich vu AI.", "unavailable", error);
       }
 
-      const buffer = Buffer.from(await res.arrayBuffer());
       const latencyMs = Date.now() - t0;
 
       if (!res.ok) {
@@ -88,12 +97,13 @@ export const pollinationsProvider: ImageProvider = {
         );
       }
 
-      if (buffer.length < 1024) {
-        // Phan hoi qua nho gan nhu chac chan khong phai anh that
-        throw new ProviderError("Dich vu AI tra ket qua khong hop le.", "invalid", buffer.toString("utf8").slice(0, 200));
+      const mimeType = imageMimeType(buffer);
+      const declaredType = res.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
+      if (!mimeType || buffer.length < 1024 || (declaredType && declaredType !== mimeType && declaredType !== "application/octet-stream")) {
+        throw new ProviderError("Dich vu AI tra ket qua khong phai anh hop le.", "invalid");
       }
 
-      return { data: buffer, mimeType: res.headers.get("content-type") ?? "image/jpeg", latencyMs, provider: this.name };
+      return { data: buffer, mimeType, latencyMs, provider: this.name };
     }
   },
 };
