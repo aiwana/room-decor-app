@@ -36,7 +36,7 @@ export const setUnauthorizedHandler = (handler: (() => void) | null): void => {
 
 apiClient.interceptors.request.use((config) => {
   if (authToken) {
-    // DE XUAT: "Authorization: Bearer <token>" - can xac nhan voi backend
+    // Backend uses JWT bearer tokens.
     config.headers.set('Authorization', `Bearer ${authToken}`);
   }
   return config;

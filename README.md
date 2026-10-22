@@ -5,7 +5,9 @@ chụp hoặc chọn ảnh phòng → chọn loại phòng, phong cách, màu �
 Module phụ **Catalog vật liệu** cho phép xem sản phẩm được dùng trong thiết kế và gửi yêu cầu báo giá.
 
 Expo SDK 57 · React Native 0.86 · Expo Router · TypeScript strict.
-Giai đoạn hiện tại: **frontend dùng mock data** (chưa có backend / AI thật).
+Backend Express + PostgreSQL đã chạy thật (nhánh `backend-db`); đã tích hợp tác vụ AI bất đồng bộ qua Pollinations. Mặc định app vẫn dùng dữ liệu giả cho đến khi đặt `EXPO_PUBLIC_USE_MOCK=false`.
+
+**Thành viên mới:** cài đặt theo thứ tự trong [docs/README.md](./docs/README.md).
 
 ## Chạy dự án
 
@@ -16,14 +18,13 @@ npm run typecheck       # kiểm tra TypeScript (chỉ frontend, không quét ba
 npm run lint            # kiểm tra ESLint (chỉ frontend)
 ```
 
-Backend nằm trong `backend/` và có `package.json`, `tsconfig.json` riêng:
+Backend nằm trong `backend/` và có `package.json`, `tsconfig.json` riêng. Backend dùng PostgreSQL.
+Cách dựng PostgreSQL + backend (Docker hoặc `npm run dev`): xem [docs/README.md](./docs/README.md).
 
-```bash
-cd backend
-npm install
-npm run dev             # http://localhost:3000/health
-npm run typecheck
-```
+Đặt `EXPO_PUBLIC_USE_MOCK=false` trong file `.env` tại gốc dự án để app gọi API thật.
+Đặt `EXPO_PUBLIC_API_URL` theo địa chỉ backend đang chạy (xem `.env.example`); khi dùng điện thoại thật,
+địa chỉ phải là IPv4 LAN của máy chạy backend và hai thiết bị phải cùng mạng. Không đưa `DATABASE_URL` hay
+`JWT_SECRET` vào biến `EXPO_PUBLIC_*`.
 
 Nếu vừa đổi route/thư mục mà gặp lỗi lạ: `npx expo start -c` (xoá cache).
 
@@ -72,13 +73,12 @@ src/
 Màn hình **không bao giờ** import thẳng `data/mock`. Mọi dữ liệu đi qua `src/services/`.
 Mỗi service có 2 bản cùng 1 interface: `mockXxxService` và `apiXxxService`, chọn theo `USE_MOCK`.
 
-- Đường dẫn API: chỉ ở `src/services/endpoints.ts`. Hiện backend **chỉ có** `GET /health`,
-  các đường dẫn khác là **đề xuất** (xem `docs/api-contract-de-xuat.md`).
+- Đường dẫn API: chỉ ở `src/services/endpoints.ts`. Danh sách endpoint backend: [docs/api-contract.md](./docs/api-contract.md).
 - Địa chỉ backend: chỉ ở `src/services/config.ts`, đổi bằng file `.env` (xem `.env.example`):
 
 | Chạy app ở đâu | `EXPO_PUBLIC_API_URL` |
 |---|---|
-| Android Emulator | `http://10.0.2.2:3000` (mặc định nếu bỏ trống) |
+| Android Emulator | `http://10.0.2.2:3000` (mặc định nếu bỏ trống). Backend chạy bằng Docker thì dùng cổng `3001` |
 | Web trên cùng máy | `http://localhost:3000` (mặc định nếu bỏ trống) |
 | Điện thoại thật (Expo Go) | `http://<IPv4 của máy tính>:3000`, lấy bằng `ipconfig`, cùng Wi-Fi |
 
@@ -86,5 +86,24 @@ Mỗi service có 2 bản cùng 1 interface: `mockXxxService` và `apiXxxService
 - Lỗi mạng/HTTP được đổi sang tiếng Việt ở `src/services/apiError.ts`.
 - Token đăng nhập lưu bằng `expo-secure-store` (không dùng AsyncStorage, không lưu mật khẩu).
 
-AI thật: chỉ cần sửa `apiAiService` trong `src/services/aiService.ts`. UI không phải sửa.
+AI thật: `src/services/aiService.ts` gửi ảnh và lựa chọn lên `POST /api/designs`, nhận trạng thái `processing`, rồi polling đến `done` hoặc `failed`. Backend gọi provider trong `backend/src/ai/`.
 Thử màn hình lỗi của AI: đặt `MOCK_AI_FAIL_RATE = 0.5` trong `src/services/config.ts`.
+
+## Phạm vi AI và kiểm tra trước khi demo
+
+Provider hiện tại tạo ảnh từ mô tả (text-to-image). Ảnh phòng tải lên được lưu để đối chiếu trước/sau; chưa được đưa vào mô hình để giữ bố cục phòng gốc. Vì vậy, kết quả là gợi ý nội thất theo phong cách, chưa phải bản cải tạo chính xác của căn phòng. Muốn giữ bố cục cần bổ sung provider image-to-image.
+
+Backend kiểm tra chữ ký JPEG/PNG/WebP và Content-Type trước khi lưu ảnh AI; phản hồi HTML/JSON hoặc ảnh quá ngắn sẽ báo lỗi. Lỗi mạng, lỗi tải dữ liệu và HTTP 504 được xử lý theo cơ chế retry hiện có.
+
+Chạy kiểm thử từ thư mục `backend/`:
+
+```bash
+npm ci
+npm run typecheck
+npm test -- --runTestsByPath src/__tests__/ai-provider.test.ts
+npm test
+```
+
+Kiểm thử provider giả lập phản hồi HTTP, không gọi dịch vụ AI và không tốn phí. Chúng kiểm tra định dạng dữ liệu và xử lý lỗi, không kiểm chứng chất lượng ảnh hay khả năng sẵn sàng của dịch vụ thực tế.
+
+Khi demo: đăng nhập → chọn ảnh phòng → chọn phong cách → tạo thiết kế → kiểm tra trạng thái chờ → xem kết quả → lưu vào lịch sử. Nếu dịch vụ bận, chờ cơ chế retry hoặc xem thông báo lỗi. Xem thêm [tài liệu tích hợp AI](docs/tich-hop-ai.md).

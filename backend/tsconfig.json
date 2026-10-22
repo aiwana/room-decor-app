@@ -12,6 +12,7 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
+    "noEmit": false,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "sourceMap": true
@@ -21,7 +22,7 @@
   ],
   "exclude": [
     "node_modules",
-    "dist"
-  ],
-  "extends": "expo/tsconfig.base"
+    "dist",
+    "src/**/__tests__/**"
+  ]
 }
