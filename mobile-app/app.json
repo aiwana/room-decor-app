@@ -4,13 +4,23 @@
     "slug": "roomdecor",
     "version": "1.0.0",
     "scheme": "roomdecor",
+    "userInterfaceStyle": "dark",
     "platforms": ["ios", "android"],
     "ios": { "bundleIdentifier": "com.roomdecor.app" },
-    "android": { "package": "com.roomdecor.app" },
+    "android": {
+      "package": "com.roomdecor.app",
+      "backgroundColor": "#1A1A1A"
+    },
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-image-picker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "RoomDecor cần truy cập thư viện ảnh để chọn ảnh căn phòng.",
+          "cameraPermission": "RoomDecor cần camera để chụp ảnh căn phòng."
+        }
+      ],
       "expo-camera"
     ]
   }

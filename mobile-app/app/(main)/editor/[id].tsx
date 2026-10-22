@@ -1,18 +1,369 @@
-import { View, Text, StyleSheet } from "expo-router";
-import { useLocalSearchParams } from "expo-router";
+/**
+ * app/(main)/editor/[id].tsx
+ * TRINH CHINH SUA 2D (thay man Result cu): dat noi that len anh phong.
+ *
+ *   - "Them do"   : mo bang chon noi that, mon moi dat o giua anh
+ *   - Cu chi      : keo / chum (phong to) / xoay 2 ngon tren tung mon (xem PlacedItem)
+ *   - Thanh duoi  : khi chon 1 mon -> xoay 45°, nho hon, to hon, xoa (cho ai khong quen cu chi)
+ *   - "AI goi y"  : POST /api/ai/suggest-layout (backend chua co AI -> goi y mau)
+ *   - "Luu"       : luu vi tri do. HIEN TAI luu tren may (backend chua co PUT /api/designs/{id})
+ *
+ * Toa do luu theo ti le anh (0..1) nen mo tren man hinh khac kich thuoc van dung cho.
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
+import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
+
+import Button from '@/components/common/Button';
+import { MockModeNotice, Notice } from '@/components/common/Notice';
+import { ErrorView, LoadingView } from '@/components/common/StateViews';
+import FurniturePicker from '@/components/editor/FurniturePicker';
+import PlacedItem, { MAX_SCALE, MIN_SCALE, type FrameSize } from '@/components/editor/PlacedItem';
+import { COLORS, RADIUS, SPACING } from '@/constants/colors';
+import { useAsync } from '@/hooks/useAsync';
+import { aiApi } from '@/services/ai-api';
+import { getErrorMessage } from '@/services/api-error';
+import { designApi } from '@/services/design-api';
+import { furnitureApi } from '@/services/furniture-api';
+import type { DesignDetail, Furniture, FurniturePlacement } from '@/types';
+import { clamp, createId, firstParam } from '@/utils';
+
+/** Ti le khung anh mac dinh khi chua biet kich thuoc anh */
+const DEFAULT_RATIO = 4 / 3;
+const SCALE_STEP = 1.15;
+
+interface EditorData {
+  design: DesignDetail;
+  furniture: Furniture[];
+}
+
+const loadEditorData = async (id: string): Promise<EditorData> => {
+  const [design, list] = await Promise.all([designApi.getById(id), furnitureApi.list()]);
+  return { design, furniture: list.items };
+};
 
 export default function EditorScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const id = firstParam(useLocalSearchParams<{ id: string }>().id) ?? '';
+  const { data, loading, error, reload } = useAsync(() => loadEditorData(id), [id]);
 
+  if (loading && !data) return <LoadingView message="Đang mở thiết kế..." />;
+  if (error || !data) return <ErrorView message={getErrorMessage(error)} onRetry={reload} />;
+  return <Editor key={data.design.id} design={data.design} furniture={data.furniture} />;
+}
+
+/* =========================================================================== */
+
+interface EditorProps {
+  design: DesignDetail;
+  furniture: Furniture[];
+}
+
+function Editor({ design, furniture }: EditorProps) {
+  const navigation = useNavigation();
+
+  const [placements, setPlacements] = useState<FurniturePlacement[]>(design.placements);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiNote, setAiNote] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [ratio, setRatio] = useState(DEFAULT_RATIO);
+  // Mon do them tu bang chon co the chua nam trong danh sach tai luc dau (vd loc theo danh muc)
+  const [extraFurniture, setExtraFurniture] = useState<Furniture[]>([]);
+
+  const furnitureById = useMemo(() => {
+    const map = new Map<string, Furniture>();
+    [...furniture, ...extraFurniture].forEach((f) => map.set(f.id, f));
+    return map;
+  }, [furniture, extraFurniture]);
+
+  const frame: FrameSize = { width: containerWidth, height: containerWidth / ratio };
+  const selected = placements.find((p) => p.id === selectedId);
+
+  /* ---------------- Canh bao khi thoat ma chua luu ---------------- */
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (!dirty) return;
+      e.preventDefault();
+      Alert.alert('Chưa lưu thay đổi', 'Bạn có muốn bỏ các thay đổi chưa lưu?', [
+        { text: 'Ở lại', style: 'cancel' },
+        { text: 'Bỏ thay đổi', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+      ]);
+    });
+    return unsubscribe;
+  }, [navigation, dirty]);
+
+  /* ---------------- Thao tac tren danh sach do ---------------- */
+  const updatePlacements = (updater: (prev: FurniturePlacement[]) => FurniturePlacement[]): void => {
+    setPlacements(updater);
+    setDirty(true);
+  };
+
+  const handleChange = useCallback(
+    (placementId: string, patch: Pick<FurniturePlacement, 'x' | 'y' | 'rotation' | 'scale'>): void => {
+      setPlacements((prev) => prev.map((p) => (p.id === placementId ? { ...p, ...patch } : p)));
+      setDirty(true);
+    },
+    [],
+  );
+
+  const handleSelect = useCallback((placementId: string): void => setSelectedId(placementId), []);
+
+  const addFurniture = (item: Furniture): void => {
+    setPickerOpen(false);
+    if (!furnitureById.has(item.id)) setExtraFurniture((prev) => [...prev, item]);
+    const placement: FurniturePlacement = { id: createId('pl'), furnitureId: item.id, x: 0.5, y: 0.6, rotation: 0, scale: 1 };
+    updatePlacements((prev) => [...prev, placement]);
+    setSelectedId(placement.id);
+  };
+
+  const patchSelected = (patch: (p: FurniturePlacement) => Partial<FurniturePlacement>): void => {
+    if (!selectedId) return;
+    updatePlacements((prev) => prev.map((p) => (p.id === selectedId ? { ...p, ...patch(p) } : p)));
+  };
+
+  const removeSelected = (): void => {
+    if (!selectedId) return;
+    updatePlacements((prev) => prev.filter((p) => p.id !== selectedId));
+    setSelectedId(null);
+  };
+
+  /* ---------------- AI goi y ---------------- */
+  const runAi = async (): Promise<void> => {
+    if (!design.roomImageId) {
+      Alert.alert('Không dùng được AI', 'Thiết kế này không còn ảnh phòng trên máy chủ.');
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const result = await aiApi.suggestLayout(design.roomImageId, furniture);
+      updatePlacements(() => result.placements);
+      setSelectedId(null);
+      setAiNote(result.isSample ? `${result.description} (AI chưa sẵn sàng, đây là gợi ý mẫu.)` : result.description);
+    } catch (e) {
+      Alert.alert('AI gợi ý thất bại', getErrorMessage(e));
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleAi = (): void => {
+    if (placements.length === 0) {
+      void runAi();
+      return;
+    }
+    Alert.alert('Dùng gợi ý của AI?', 'Các món đồ đang đặt sẽ được thay bằng bố trí AI gợi ý.', [
+      { text: 'Huỷ', style: 'cancel' },
+      { text: 'Đồng ý', onPress: (): void => void runAi() },
+    ]);
+  };
+
+  /* ---------------- Luu ---------------- */
+  const handleSave = async (): Promise<void> => {
+    setSaving(true);
+    try {
+      await designApi.savePlacements(design.id, placements);
+      setDirty(false);
+    } catch (e) {
+      Alert.alert('Không lưu được thiết kế', getErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onLayout = (e: LayoutChangeEvent): void => setContainerWidth(e.nativeEvent.layout.width);
+
+  /* ---------------- Render ---------------- */
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Design Editor</Text>
-      <Text>Editing design: {id}</Text>
+    <View style={styles.screen}>
+      <Stack.Screen
+        options={{
+          title: design.name,
+          headerRight: () => (
+            <Pressable onPress={(): void => void handleSave()} disabled={!dirty || saving} hitSlop={8} accessibilityRole="button">
+              <Text style={[styles.headerSave, (!dirty || saving) && styles.headerSaveDisabled]}>
+                {saving ? 'Đang lưu' : dirty ? 'Lưu' : 'Đã lưu'}
+              </Text>
+            </Pressable>
+          ),
+        }}
+      />
+
+      <ScrollView contentContainerStyle={styles.scrollContent} scrollEnabled={!selectedId}>
+        <MockModeNotice />
+        <Notice message="Vị trí nội thất đang lưu trên máy này (máy chủ chưa có API lưu)." />
+
+        {/* ===== Khung anh phong + do ===== */}
+        <View style={styles.frameWrap} onLayout={onLayout}>
+          {containerWidth > 0 ? (
+            <Pressable
+              style={[styles.frame, { height: frame.height }]}
+              onPress={(): void => setSelectedId(null)}
+              accessibilityLabel="Ảnh căn phòng"
+            >
+              {design.roomImageUri ? (
+                <Image
+                  source={{ uri: design.roomImageUri }}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                  onLoad={(e): void => {
+                    const { width, height } = e.source;
+                    if (width > 0 && height > 0) setRatio(clamp(width / height, 0.5, 2));
+                  }}
+                />
+              ) : (
+                <View style={styles.noImage}>
+                  <Ionicons name="image-outline" size={40} color={COLORS.inactive} />
+                  <Text style={styles.noImageText}>Máy này không có ảnh phòng của thiết kế.</Text>
+                </View>
+              )}
+              {placements.map((p) => (
+                <PlacedItem
+                  key={p.id}
+                  placement={p}
+                  furniture={furnitureById.get(p.furnitureId)}
+                  frame={frame}
+                  selected={p.id === selectedId}
+                  onSelect={handleSelect}
+                  onChange={handleChange}
+                />
+              ))}
+            </Pressable>
+          ) : null}
+        </View>
+
+        <Text style={styles.tip}>
+          {placements.length === 0
+            ? 'Bấm "Thêm đồ" để đặt nội thất lên ảnh.'
+            : 'Kéo để di chuyển, dùng 2 ngón để phóng to và xoay. Chạm vào ảnh trống để bỏ chọn.'}
+        </Text>
+
+        {aiNote ? (
+          <View style={styles.aiNote}>
+            <Ionicons name="sparkles" size={16} color={COLORS.accent} />
+            <Text style={styles.aiNoteText}>{aiNote}</Text>
+            <Pressable onPress={(): void => setAiNote(null)} hitSlop={8} accessibilityLabel="Ẩn gợi ý">
+              <Ionicons name="close" size={16} color={COLORS.textSecondary} />
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* ===== Thanh dieu khien mon dang chon ===== */}
+        {selected ? (
+          <View style={styles.selectedBar}>
+            <Text style={styles.selectedName} numberOfLines={1}>
+              {furnitureById.get(selected.furnitureId)?.name ?? 'Món đồ'}
+            </Text>
+            <View style={styles.selectedActions}>
+              <ToolButton icon="refresh" label="Xoay" onPress={(): void => patchSelected((p) => ({ rotation: (p.rotation + 45) % 360 }))} />
+              <ToolButton
+                icon="remove"
+                label="Nhỏ"
+                onPress={(): void => patchSelected((p) => ({ scale: clamp(p.scale / SCALE_STEP, MIN_SCALE, MAX_SCALE) }))}
+              />
+              <ToolButton
+                icon="add"
+                label="To"
+                onPress={(): void => patchSelected((p) => ({ scale: clamp(p.scale * SCALE_STEP, MIN_SCALE, MAX_SCALE) }))}
+              />
+              <ToolButton icon="trash-outline" label="Xoá" danger onPress={removeSelected} />
+            </View>
+          </View>
+        ) : null}
+
+        <Text style={styles.count}>{placements.length} món đồ trong thiết kế</Text>
+      </ScrollView>
+
+      {/* ===== Thanh cong cu duoi ===== */}
+      <View style={styles.toolbar}>
+        <Button title="Thêm đồ" iconName="add-circle-outline" variant="secondary" onPress={(): void => setPickerOpen(true)} style={styles.toolbarButton} />
+        <Button
+          title="AI gợi ý"
+          iconName="sparkles-outline"
+          variant="ghost"
+          onPress={handleAi}
+          loading={aiLoading}
+          style={styles.toolbarButton}
+        />
+        <Button
+          title={dirty ? 'Lưu' : 'Đã lưu'}
+          iconName="save-outline"
+          onPress={(): void => void handleSave()}
+          disabled={!dirty}
+          loading={saving}
+          style={styles.toolbarButton}
+        />
+      </View>
+
+      <FurniturePicker visible={pickerOpen} onClose={(): void => setPickerOpen(false)} onPick={addFurniture} />
     </View>
   );
 }
 
+interface ToolButtonProps {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+}
+
+const ToolButton: React.FC<ToolButtonProps> = ({ icon, label, onPress, danger }) => (
+  <Pressable style={({ pressed }) => [styles.tool, pressed && styles.toolPressed]} onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
+    <Ionicons name={icon} size={20} color={danger ? COLORS.danger : COLORS.textPrimary} />
+    <Text style={[styles.toolLabel, danger && styles.toolDanger]}>{label}</Text>
+  </Pressable>
+);
+
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24 },
-  title: { fontSize: 24, fontWeight: "bold", marginBottom: 12 },
+  screen: { flex: 1, backgroundColor: COLORS.background },
+  scrollContent: { paddingTop: SPACING.sm, paddingBottom: SPACING.lg },
+  headerSave: { fontSize: 15, fontWeight: '700', color: COLORS.accent },
+  headerSaveDisabled: { color: COLORS.inactive },
+  frameWrap: { marginHorizontal: SPACING.md, borderRadius: RADIUS.lg, overflow: 'hidden' },
+  frame: { width: '100%', backgroundColor: COLORS.surfaceAlt, overflow: 'hidden' },
+  noImage: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', padding: SPACING.md },
+  noImageText: { marginTop: SPACING.sm, fontSize: 13, color: COLORS.textSecondary, textAlign: 'center' },
+  tip: { fontSize: 12, color: COLORS.textSecondary, textAlign: 'center', marginTop: SPACING.sm, paddingHorizontal: SPACING.md },
+  aiNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.sm,
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.md,
+    padding: 12,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surface,
+  },
+  aiNoteText: { flex: 1, fontSize: 13, color: COLORS.textPrimary, lineHeight: 18 },
+  selectedBar: {
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.md,
+    padding: 12,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+  },
+  selectedName: { fontSize: 14, fontWeight: '700', color: COLORS.textPrimary, marginBottom: SPACING.sm },
+  selectedActions: { flexDirection: 'row', justifyContent: 'space-between' },
+  tool: { flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: RADIUS.sm },
+  toolPressed: { backgroundColor: COLORS.surfaceAlt },
+  toolLabel: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
+  toolDanger: { color: COLORS.danger },
+  count: { fontSize: 12, color: COLORS.inactive, textAlign: 'center', marginTop: SPACING.md },
+  toolbar: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.lg,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.background,
+  },
+  toolbarButton: { flex: 1, paddingHorizontal: SPACING.sm },
 });

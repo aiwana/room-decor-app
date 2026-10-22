@@ -1,28 +1,30 @@
-import { useState, useEffect, useCallback } from "react";
-import { designApi } from "@/services/design-api";
-import type { Design } from "@/types";
+/**
+ * src/hooks/useDesigns.ts
+ * Danh sach thiet ke cua nguoi dung. Tu tai lai moi khi man hinh duoc mo lai
+ * (vd quay ve tu trinh chinh sua) de thay thay doi moi nhat.
+ */
+import { useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 
-export function useDesigns() {
-  const [designs, setDesigns] = useState<Design[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+import { designApi } from '@/services/design-api';
+import type { DesignDetail } from '@/types';
 
-  const fetch = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await designApi.getAll();
-      setDesigns(data);
-      setError(null);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+import { useAsync } from './useAsync';
 
-  useEffect(() => {
-    fetch();
-  }, [fetch]);
+export function useDesigns(): {
+  designs: DesignDetail[];
+  loading: boolean;
+  error: unknown;
+  refresh: () => void;
+} {
+  const { data, loading, error, reload } = useAsync(() => designApi.getAll(), []);
 
-  return { designs, loading, error, refresh: fetch };
+  // Lan dau mo man hinh useAsync da tai; cac lan focus sau thi tai lai
+  useFocusEffect(
+    useCallback(() => {
+      reload();
+    }, [reload]),
+  );
+
+  return { designs: data ?? [], loading: loading && !data, error, refresh: reload };
 }
