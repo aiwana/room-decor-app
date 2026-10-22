@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "RoomDecor",
+    "slug": "roomdecor",
+    "version": "1.0.0",
+    "scheme": "roomdecor",
+    "platforms": ["ios", "android"],
+    "ios": { "bundleIdentifier": "com.roomdecor.app" },
+    "android": { "package": "com.roomdecor.app" },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-image-picker",
+      "expo-camera"
+    ]
+  }
+}

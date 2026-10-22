@@ -1,16 +1,14 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
+# Dependencies
 node_modules/
+.pnp/
+.pnp.js
 
 # Expo
 .expo/
 dist/
 web-build/
-expo-env.d.ts
 
 # Native
-.kotlin/
 *.orig.*
 *.jks
 *.p8
@@ -18,39 +16,35 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env
-.env*.local
-
-# typescript
-*.tsbuildinfo
-
-example
-backend/dist/
-backend/storage/uploads/
-
-# npm cache bi sandbox chan, tao trong du an khi install
-.npm-cache/
-backend/.npm-cache/
-
-# generated native folders
-/ios
-/android
-
 # IDE
 .idea/
+.vscode/
+*.iml
+*.swp
 
-# Test coverage: Jenkins tự sinh, không commit
-backend/coverage/
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+*.env
+
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+*.log
+.gradle/
+build/
+mvnw
+mvnw.cmd
+.mvn/
+
+# Uploads
+uploads/
+
+# Generated
+*.tsbuildinfo
