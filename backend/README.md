@@ -34,11 +34,15 @@ Real environment variables (for example in Docker or Jenkins) override values fr
 
 ## API Endpoints
 
+Interactive docs (Swagger UI): http://localhost:8080/swagger-ui.html (click **Authorize** and paste the token from `/api/auth/login`).
+Auth API details, error format and roles: [docs/api-auth.md](docs/api-auth.md).
+
 | Method | Path | Description | Auth |
 |--------|------|-------------|------|
 | POST | /api/auth/register | Register new user | No |
 | POST | /api/auth/login | Login | No |
 | GET | /api/users/me | Get current user profile | Yes |
+| GET | /api/admin/users | List all users | ADMIN |
 | GET | /api/furniture | List furniture (optional category filter) | Yes |
 | GET | /api/furniture/{id} | Get furniture by ID | Yes |
 | GET | /api/furniture/search?q= | Search furniture by name | Yes |

@@ -45,6 +45,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/files/**").permitAll()
                 // Spring forwards unhandled errors to /error; keep it public so they are not turned into 401
                 .requestMatchers("/error").permitAll()
+                .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
