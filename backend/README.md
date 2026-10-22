@@ -11,16 +11,26 @@ Spring Boot backend for the RoomDecor application.
 
 ## Getting Started
 
-```bash
-# 1. Start PostgreSQL (requires database named "roomdecor")
-# 2. Copy env file and update values
-cp .env.example .env
+```powershell
+# 1. Start PostgreSQL (team container room-decor-postgres, port 5433, database "roomdecor")
+docker start room-decor-postgres
 
-# 3. Run with Maven (Windows)
-.\mvnw spring-boot:run
+# 2. Create backend/.env from the example, then fill in DB_PASSWORD and JWT_SECRET
+cd backend
+Copy-Item .env.example .env
+
+# 3. Run with the Maven Wrapper (downloads Maven 3.9.9 on first run; Flyway creates the tables on first start)
+.\mvnw.cmd spring-boot:run
+
+# Optional: dev profile (SQL and security debug logs)
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=dev"
 
 # 4. API will be available at http://localhost:8080/api
 ```
+
+Spring Boot does not read `.env` files by default. `application.yml` imports `backend/.env`
+(`spring.config.import: optional:file:.env[.properties]`), so run the commands from the `backend` folder.
+Real environment variables (for example in Docker or Jenkins) override values from `.env`.
 
 ## API Endpoints
 

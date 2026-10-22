@@ -1,8 +1,12 @@
 spring:
+  config:
+    # Spring Boot does not read .env files by itself; load backend/.env when it exists
+    import: optional:file:.env[.properties]
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/roomdecor}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/roomdecor}
+    username: ${DB_USERNAME:roomdecor_app}
+    # No default: the app must fail at startup if the password is not provided
+    password: ${DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -20,8 +24,9 @@ server:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:your-256-bit-secret-key-change-in-production}
-    expiration-ms: 86400000
+    # No default: a weak or missing secret must not reach any environment (min 32 characters)
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   storage:
     upload-dir: ${UPLOAD_DIR:./uploads}
     base-url: ${STORAGE_BASE_URL:http://localhost:8080/files}

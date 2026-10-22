@@ -39,9 +39,6 @@ target/
 *.log
 .gradle/
 build/
-mvnw
-mvnw.cmd
-.mvn/
 
 # Uploads
 uploads/
