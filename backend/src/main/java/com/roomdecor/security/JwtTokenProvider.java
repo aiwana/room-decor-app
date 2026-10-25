@@ -1,5 +1,6 @@
 package com.roomdecor.security;
 
+import com.roomdecor.entity.Role;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,13 +25,14 @@ public class JwtTokenProvider {
         this.expirationMs = expirationMs;
     }
 
-    public String generateToken(UUID userId, String email) {
+    public String generateToken(UUID userId, String email, Role role) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMs);
 
         return Jwts.builder()
             .subject(userId.toString())
             .claim("email", email)
+            .claim("role", role.name())
             .issuedAt(now)
             .expiration(expiry)
             .signWith(key)
@@ -38,12 +40,13 @@ public class JwtTokenProvider {
     }
 
     public UUID getUserIdFromToken(String token) {
-        Claims claims = Jwts.parser()
-            .verifyWith(key)
-            .build()
-            .parseSignedClaims(token)
-            .getPayload();
-        return UUID.fromString(claims.getSubject());
+        return UUID.fromString(parseClaims(token).getSubject());
+    }
+
+    public Role getRoleFromToken(String token) {
+        String role = parseClaims(token).get("role", String.class);
+        // Tokens issued before roles existed have no role claim: treat them as USER
+        return role == null ? Role.USER : Role.valueOf(role);
     }
 
     public boolean validateToken(String token) {
@@ -53,5 +56,13 @@ public class JwtTokenProvider {
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
+    }
+
+    private Claims parseClaims(String token) {
+        return Jwts.parser()
+            .verifyWith(key)
+            .build()
+            .parseSignedClaims(token)
+            .getPayload();
     }
 }

@@ -35,11 +35,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (StringUtils.hasText(token) && tokenProvider.validateToken(token)) {
             var userId = tokenProvider.getUserIdFromToken(token);
+            var role = tokenProvider.getRoleFromToken(token);
 
+            // Spring Security expects the "ROLE_" prefix for hasRole("ADMIN") checks
             var authToken = new UsernamePasswordAuthenticationToken(
                 userId,
                 null,
-                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                List.of(new SimpleGrantedAuthority("ROLE_" + role.name()))
             );
             authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authToken);

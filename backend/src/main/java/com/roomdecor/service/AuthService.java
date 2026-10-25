@@ -1,6 +1,7 @@
 package com.roomdecor.service;
 
 import com.roomdecor.dto.auth.*;
+import com.roomdecor.entity.Role;
 import com.roomdecor.entity.User;
 import com.roomdecor.exception.BadRequestException;
 import com.roomdecor.mapper.UserMapper;
@@ -33,11 +34,13 @@ public class AuthService {
             .name(request.name())
             .email(request.email())
             .password(passwordEncoder.encode(request.password()))
+            // Self-registration always creates a USER; ADMIN is granted manually in the database
+            .role(Role.USER)
             .build();
 
         user = userRepository.save(user);
 
-        String token = tokenProvider.generateToken(user.getId(), user.getEmail());
+        String token = tokenProvider.generateToken(user.getId(), user.getEmail(), user.getRole());
         return new AuthResponse(token, UserMapper.toDto(user));
     }
 
@@ -49,7 +52,7 @@ public class AuthService {
             throw new BadRequestException("Invalid email or password");
         }
 
-        String token = tokenProvider.generateToken(user.getId(), user.getEmail());
+        String token = tokenProvider.generateToken(user.getId(), user.getEmail(), user.getRole());
         return new AuthResponse(token, UserMapper.toDto(user));
     }
 }

@@ -1,0 +1,30 @@
+# PostgreSQL for the RoomDecor backend, for machines that do not have the team database yet.
+# Run from the backend folder:  docker compose up -d
+# User and password come from backend/.env (DB_USERNAME, DB_PASSWORD), the same values the backend uses.
+# Data is kept in the Docker volume roomdecor_pgdata; "docker compose down" keeps it, "down -v" deletes it.
+# Already running the old room-decor-postgres container on port 5433? Keep using it and skip this file.
+
+name: roomdecor
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: roomdecor-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: roomdecor
+      POSTGRES_USER: ${DB_USERNAME:-roomdecor_app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in backend/.env first}
+    ports:
+      # Only reachable from this machine, on the port application.yml expects
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
