@@ -1,0 +1,55 @@
+/**
+ * src/components/furniture/FurnitureCard.tsx
+ * The 1 mon noi that (thay ProductCard cu).
+ * variant 'horizontal' -> cuon ngang (Home); 'grid' -> luoi 2 cot (Danh muc, bang chon do)
+ */
+import React from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { COLORS, RADIUS } from '@/constants/colors';
+import { formatDimensions, getCategoryLabel } from '@/constants/furniture';
+import type { Furniture } from '@/types';
+
+import FurnitureThumb from './FurnitureThumb';
+
+interface FurnitureCardProps {
+  furniture: Furniture;
+  variant?: 'horizontal' | 'grid';
+  onPress: (furniture: Furniture) => void;
+}
+
+const FurnitureCard: React.FC<FurnitureCardProps> = ({ furniture, variant = 'grid', onPress }) => (
+  <Pressable
+    style={({ pressed }) => [styles.card, variant === 'horizontal' ? styles.horizontal : styles.grid, pressed && styles.pressed]}
+    onPress={(): void => onPress(furniture)}
+    accessibilityRole="button"
+    accessibilityLabel={furniture.name}
+  >
+    <FurnitureThumb furniture={furniture} style={styles.image} />
+    <View style={styles.info}>
+      <Text style={styles.category} numberOfLines={1}>
+        {getCategoryLabel(furniture.category)}
+      </Text>
+      <Text style={styles.title} numberOfLines={2}>
+        {furniture.name}
+      </Text>
+      <Text style={styles.size} numberOfLines={1}>
+        {formatDimensions(furniture)}
+      </Text>
+    </View>
+  </Pressable>
+);
+
+const styles = StyleSheet.create({
+  card: { borderRadius: RADIUS.md, backgroundColor: COLORS.surface, overflow: 'hidden' },
+  horizontal: { width: 150, marginRight: 12 },
+  grid: { flex: 1 },
+  pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
+  image: { width: '100%', aspectRatio: 1 },
+  info: { padding: 8 },
+  category: { fontSize: 10, color: COLORS.textSecondary, textTransform: 'uppercase', fontWeight: '600' },
+  title: { fontSize: 13, fontWeight: '600', color: COLORS.textPrimary, marginTop: 2, minHeight: 34 },
+  size: { fontSize: 12, fontWeight: '700', color: COLORS.accent, marginTop: 4 },
+});
+
+export default FurnitureCard;

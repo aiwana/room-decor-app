@@ -1,27 +1,59 @@
-# Tài liệu Room Decor AI: đọc theo thứ tự này
+# RoomDecor: hướng dẫn cài đặt và chạy dự án
 
-Thành viên mới làm lần lượt từ bước 1. Mỗi file có **kết quả mong đợi**, chỉ đi tiếp khi đã thấy đúng kết quả.
+RoomDecor là app di động giúp người dùng chụp ảnh căn phòng, để AI dựng mặt bằng 2D, đặt thử nội thất và xem trước bằng 3D.
 
-| Bước | File | Bắt buộc? | Làm gì |
-| --- | --- | --- | --- |
-| 1 | [01-cai-dat-he-thong.md](./01-cai-dat-he-thong.md) | Bắt buộc | Cài Docker, tạo PostgreSQL cho app, chạy backend trong Docker, dựng Jenkins + SonarQube và job `room-decor-ci` |
-| 2 | [02-chay-app-mobile.md](./02-chay-app-mobile.md) | Bắt buộc nếu làm app | Cài thư viện Expo, tạo file `.env` ở gốc, nối app với backend, chạy trên Android Emulator |
-| 3 | [03-backend-chay-truc-tiep.md](./03-backend-chay-truc-tiep.md) | Tuỳ chọn | Chạy backend bằng `npm run dev` (tự tải lại khi sửa code), dùng chung DB với bước 1 |
-| Tra cứu | [api-contract.md](./api-contract.md) | Khi cần | Danh sách endpoint, dữ liệu gửi/nhận, mã lỗi |
+| Phần | Thư mục | Công nghệ |
+|---|---|---|
+| Backend (REST API) | `backend/` | Java 17, Spring Boot 3.4, Spring Security + JWT, Flyway |
+| Cơ sở dữ liệu | `backend/docker-compose.yml` | PostgreSQL 16 chạy trong Docker |
+| App di động | `mobile-app/` | React Native, Expo SDK 52, Expo Router, TypeScript |
 
-## Sau khi cài xong, máy có những gì
+## Đọc theo thứ tự
 
-| Thành phần | Địa chỉ trên máy | Tạo ở bước |
-| --- | --- | --- |
-| PostgreSQL của app | `127.0.0.1:5433` | 1 |
-| Backend (Docker) | `http://localhost:3001` | 1 |
-| SonarQube | `http://localhost:9001` | 1 |
-| Jenkins | `http://localhost:8089` | 1 |
-| Backend (`npm run dev`) | `http://localhost:3000` | 3 |
-| Expo dev server | `http://localhost:8081` | 2 |
+1. [01-cai-dat.md](01-cai-dat.md): cài phần mềm cần có (Git, JDK 17, Docker Desktop, Node.js, Android Studio).
+2. [02-database.md](02-database.md): bật PostgreSQL bằng Docker Compose, Flyway, xem dữ liệu, xoá làm lại.
+3. [03-chay-backend.md](03-chay-backend.md): tạo `backend/.env`, chạy backend, Swagger, chạy test, AI quét phòng.
+4. [04-chay-mobile.md](04-chay-mobile.md): chạy app trên máy ảo Android hoặc điện thoại, chế độ mock và chế độ thật.
 
-## Ba quy tắc chung
+Tài liệu API:
 
-1. Không gửi `.env`, mật khẩu, `JWT_SECRET` hay token vào chat, ảnh chụp hoặc commit. Mỗi người tự sinh secret trên máy mình (bước 1, mục 4.1).
-2. Luôn `git add` đúng tên file, không dùng `git add .`.
-3. Không chạy các lệnh xoá dữ liệu Docker (`down -v`, `volume rm`, `prune`). Danh sách đầy đủ ở bước 1, mục 9.
+- [api.md](api.md): danh sách toàn bộ API.
+- [api-auth.md](api-auth.md): chi tiết đăng ký, đăng nhập, phân quyền USER/ADMIN, định dạng lỗi chung.
+
+## Chạy nhanh (khi đã cài đủ phần mềm)
+
+Mở 2 cửa sổ PowerShell.
+
+**Cửa sổ 1: database + backend**
+
+```powershell
+cd room-decor-app\backend
+Copy-Item .env.example .env      # lần đầu: mở .env, điền DB_PASSWORD và JWT_SECRET
+docker compose up -d             # bật PostgreSQL (cổng 5433)
+.\mvnw.cmd spring-boot:run       # backend ở http://localhost:8080
+```
+
+**Cửa sổ 2: app di động**
+
+```powershell
+cd room-decor-app\mobile-app
+npm install                      # lần đầu
+Copy-Item .env.example .env      # lần đầu: muốn gọi backend thật thì đặt EXPO_PUBLIC_USE_MOCK=false
+npx expo start -c                # bấm "a" để mở máy ảo Android
+```
+
+## Các cổng đang dùng
+
+| Cổng | Dịch vụ |
+|---|---|
+| `5433` | PostgreSQL (`127.0.0.1:5433` trên máy, `5432` bên trong container) |
+| `8080` | Backend Spring Boot (`/api`, Swagger `/swagger-ui.html`, ảnh `/files`) |
+| `8081` | Metro bundler của Expo |
+
+Máy ảo Android gọi máy tính qua `10.0.2.2`, nên app dùng `http://10.0.2.2:8080/api`.
+
+## Những điều không được làm
+
+- **Không commit file `.env`** (`backend/.env`, `mobile-app/.env`): chứa mật khẩu và khóa bí mật. Chỉ commit `.env.example`.
+- **Không sửa migration Flyway đã có** (`V1__...`, `V2__...`, `V3__...`). Muốn đổi bảng thì thêm file mới `V4__...`. Xem [02-database.md](02-database.md).
+- **Không đặt khóa bí mật vào biến `EXPO_PUBLIC_*`** của app: mọi biến này đều bị đóng gói vào app.

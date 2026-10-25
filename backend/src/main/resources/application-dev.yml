@@ -1,0 +1,9 @@
+# Dev profile: same database settings as application.yml (from .env), only more logging
+spring:
+  jpa:
+    show-sql: true
+
+logging:
+  level:
+    com.roomdecor: DEBUG
+    org.springframework.security: DEBUG
