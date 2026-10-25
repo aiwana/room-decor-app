@@ -66,7 +66,8 @@ The vision client is pluggable via the `RoomVisionClient` interface (`service/ai
 ## API Endpoints
 
 Interactive docs (Swagger UI): http://localhost:8080/swagger-ui.html (click **Authorize** and paste the token from `/api/auth/login`).
-Auth API details, error format and roles: [docs/api-auth.md](docs/api-auth.md).
+All API endpoints: [docs/api.md](../docs/api.md). Auth API details, error format and roles: [docs/api-auth.md](../docs/api-auth.md).
+Setup and run guide for the whole project (Vietnamese): [docs/README.md](../docs/README.md).
 
 | Method | Path | Description | Auth |
 |--------|------|-------------|------|

@@ -179,6 +179,7 @@ Không có API để tự lên ADMIN (cố ý, để không ai tự cấp quyề
 ## 6. Cấu hình backend (biến môi trường)
 
 Đặt trong file `backend/.env` (không commit, xem `backend/.env.example`) hoặc biến môi trường thật (Docker, Jenkins).
+Cách tạo `.env` và chạy backend: [03-chay-backend.md](03-chay-backend.md).
 
 | Biến | Bắt buộc | Mặc định | Ý nghĩa |
 |---|---|---|---|
@@ -189,5 +190,7 @@ Không có API để tự lên ADMIN (cố ý, để không ai tự cấp quyề
 | `JWT_EXPIRATION_MS` | Không | `86400000` (24 giờ) | Thời hạn token |
 | `UPLOAD_DIR` | Không | `./uploads` | Thư mục lưu ảnh upload |
 | `STORAGE_BASE_URL` | Không | `http://localhost:8080/files` | URL gốc trả về cho ảnh |
+| `OPENAI_API_KEY` | Không | (trống) | Khóa OpenAI cho AI quét phòng; để trống thì dùng phòng mẫu 4m x 4m |
+| `OPENAI_MODEL` | Không | `gpt-4o` | Model OpenAI Vision |
 
 Thiếu `DB_PASSWORD` hoặc `JWT_SECRET` thì app dừng ngay khi khởi động và báo lỗi, để không chạy nhầm với khóa yếu.

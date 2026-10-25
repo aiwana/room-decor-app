@@ -1,6 +1,6 @@
 # RoomDecor Mobile App
 
-App React Native (Expo) để chụp ảnh căn phòng và đặt thử nội thất lên ảnh. Giao diện giữ theo bản Room Decor AI cũ (nền tối, màu cam), chức năng theo bản Spring Boot mới.
+App React Native (Expo) để chụp ảnh căn phòng, để AI dựng mặt bằng 2D, đặt thử nội thất và xem trước 3D. Giao diện giữ theo bản Room Decor AI cũ (nền tối, màu cam), chức năng theo bản Spring Boot mới.
 
 ## Công nghệ
 
@@ -9,6 +9,9 @@ App React Native (Expo) để chụp ảnh căn phòng và đặt thử nội th
 - **Zustand** (trạng thái đăng nhập), **Axios** (gọi API)
 - **expo-secure-store** (lưu token), **AsyncStorage** (dữ liệu thiết kế trên máy)
 - **react-native-gesture-handler** + **react-native-reanimated** (kéo, xoay, phóng to nội thất)
+- **react-native-svg** (mặt bằng 2D), **react-native-webview** + **Three.js** (xem 3D, tải từ CDN nên cần Internet)
+
+Hướng dẫn cài đặt đầy đủ cho cả dự án: [docs/](../docs/README.md).
 
 ## Chạy app
 
@@ -37,10 +40,10 @@ Sửa `.env` xong phải chạy lại `npx expo start -c`. Màn **Hồ sơ → C
 |---|---|---|
 | Đăng nhập / Đăng ký | `app/(auth)/login.tsx`, `register.tsx` | `POST /api/auth/login`, `/register` |
 | Home | `app/(main)/(tabs)/index.tsx` | `GET /api/designs`, `/api/furniture` |
-| Thiết kế mới | `app/(main)/(tabs)/new-design.tsx` | `POST /api/room-images/upload`, `POST /api/designs` |
+| Thiết kế mới | `app/(main)/(tabs)/new-design.tsx` | `POST /api/room-images/upload`, `POST /api/designs`, `POST /api/ai/scan-room` |
 | Thiết kế của tôi | `app/(main)/(tabs)/designs.tsx` | `GET /api/designs`, `DELETE /api/designs/{id}` |
 | Hồ sơ | `app/(main)/(tabs)/profile.tsx` | `GET /api/users/me` |
-| Trình chỉnh sửa 2D | `app/(main)/editor/[id].tsx` | `GET /api/designs/{id}`, `POST /api/ai/suggest-layout` |
+| Trình chỉnh sửa (ảnh, mặt bằng 2D, 3D) | `app/(main)/editor/[id].tsx` | `GET/PUT /api/designs/{id}`, `GET /api/floor-plans/by-room-image/{id}`, `POST /api/ai/scan-room`, `POST /api/ai/suggest-layout` |
 | Danh mục nội thất | `app/(main)/furniture/index.tsx`, `[id].tsx` | `GET /api/furniture`, `/search`, `/{id}` |
 | Cài đặt | `app/(main)/settings.tsx` | (kiểm tra kết nối) |
 
@@ -48,13 +51,14 @@ App **bắt buộc đăng nhập**: `app/(main)/_layout.tsx` chuyển về `/log
 
 ## Những phần tạm thời (chờ backend)
 
-- **Vị trí nội thất** lưu trên máy (`src/services/local-store.ts`) vì backend chưa có `PUT /api/designs/{id}`. Khi có API, chỉ sửa `savePlacements()` trong `src/services/design-api.ts`.
-- **Ảnh phòng** hiển thị bằng bản trên máy vì backend chưa phục vụ file ở `/files/**`.
+- **Vị trí nội thất** lưu trên máy (`src/services/local-store.ts`) và gửi lên `PUT /api/designs/{id}` khi bấm Lưu. Nội thất mẫu (`sample-...`) chỉ lưu trên máy vì máy chủ không có các món này.
+- **Ảnh phòng** hiển thị bằng bản trên máy cho nhanh (backend đã phục vụ file ở `/files/**`).
+- **Mặt bằng 2D**: backend chưa có `OPENAI_API_KEY` thì AI trả về phòng mẫu 4m x 4m. Chế độ mock cũng dùng phòng mẫu này.
 - **Nội thất mẫu** (`src/mock/furniture.ts`, id bắt đầu bằng `sample-`) dùng khi bảng `furniture` trống.
 - **AI gợi ý**: backend đang trả danh sách rỗng, app tạo gợi ý mẫu và ghi rõ là mẫu.
-- **3D**: trình chỉnh sửa hiện là 2D. Phần hiển thị mỗi món đồ nằm trong `src/components/editor/PlacedItem.tsx`, bản 3D (React Three Fiber, GLB) sẽ thay phần này.
+- **3D**: `src/components/design/View3D.tsx` vẽ phòng bằng Three.js trong WebView, nội thất là các khối hộp theo kích thước thật. Sau này có model GLB thì thay khối hộp bằng model.
 
-Tọa độ món đồ (`x`, `y`) lưu theo tỉ lệ 0..1 của ảnh phòng, `rotation` theo độ, `scale` là hệ số phóng to (khớp bảng `furniture_placements`).
+Tọa độ món đồ (`x`, `y`) lưu theo tỉ lệ 0..1 của ảnh phòng (trên mặt bằng/3D là `x * roomWidth`, `y * roomDepth` mét), `rotation` theo độ, `scale` là hệ số phóng to (khớp bảng `furniture_placements`).
 
 ## Cấu trúc
 
@@ -62,7 +66,7 @@ Tọa độ món đồ (`x`, `y`) lưu theo tỉ lệ 0..1 của ảnh phòng, `
 app/                      Định tuyến (Expo Router)
   (auth)/                 Đăng nhập, đăng ký
   (main)/(tabs)/          4 tab: Home | Thiết kế mới | Của tôi | Hồ sơ
-  (main)/editor/[id].tsx  Trình chỉnh sửa 2D
+  (main)/editor/[id].tsx  Trình chỉnh sửa: ảnh phòng | mặt bằng 2D | 3D
   (main)/furniture/       Danh mục + chi tiết nội thất
 src/
   components/             common, home, design, furniture, editor
