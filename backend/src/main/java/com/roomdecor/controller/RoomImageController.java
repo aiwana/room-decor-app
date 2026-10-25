@@ -1,6 +1,7 @@
 package com.roomdecor.controller;
 
-import com.roomdecor.entity.RoomImage;
+import com.roomdecor.dto.roomimage.RoomImageDto;
+import com.roomdecor.mapper.RoomImageMapper;
 import com.roomdecor.service.RoomImageService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -21,15 +22,15 @@ public class RoomImageController {
     }
 
     @PostMapping("/upload")
-    public ResponseEntity<RoomImage> upload(@RequestParam("file") MultipartFile file, Authentication auth) {
+    public ResponseEntity<RoomImageDto> upload(@RequestParam("file") MultipartFile file, Authentication auth) {
         UUID userId = (UUID) auth.getPrincipal();
-        return ResponseEntity.ok(roomImageService.upload(file, userId));
+        return ResponseEntity.ok(RoomImageMapper.toDto(roomImageService.upload(file, userId)));
     }
 
     @GetMapping
-    public ResponseEntity<List<RoomImage>> getAll(Authentication auth) {
+    public ResponseEntity<List<RoomImageDto>> getAll(Authentication auth) {
         UUID userId = (UUID) auth.getPrincipal();
-        return ResponseEntity.ok(roomImageService.getByUserId(userId));
+        return ResponseEntity.ok(roomImageService.getByUserId(userId).stream().map(RoomImageMapper::toDto).toList());
     }
 
     @DeleteMapping("/{id}")
