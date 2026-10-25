@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+*.env
+
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+*.log
+.gradle/
+build/
+.mvn/*/ 
+
+# Uploads
+uploads/
+
+# Generated
+*.tsbuildinfo
