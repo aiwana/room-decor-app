@@ -1,17 +1,18 @@
 /**
  * src/services/design-api.ts
- * Thiet ke: GET/POST /api/designs, GET/DELETE /api/designs/{id}
+ * Thiet ke: GET/POST /api/designs, GET/PUT/DELETE /api/designs/{id}
  *
- * Phan backend CHUA co -> luu tren may (local-store.ts):
- *  - vi tri do (placements): chua co PUT /api/designs/{id}
- *  - anh phong (roomImageUri): may chu chua phuc vu file anh
- * Khi backend bo sung API luu, chi can sua ham savePlacements() o day.
+ * Luu ca tren may (local-store.ts) va tren may chu:
+ *  - vi tri do (placements): luu tren may + PUT /api/designs/{id}
+ *    (bo qua noi that MAU "sample-..." vi may chu khong co cac mon nay)
+ *  - anh phong (roomImageUri): giu duong dan anh tren may de hien nhanh
  *
  * Che do mock: danh sach thiet ke cung luu tren may (STORAGE_KEYS.MOCK_DESIGNS).
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { MOCK_DELAY, STORAGE_KEYS, USE_MOCK } from '@/constants';
+import { isSampleFurnitureId } from '@/mock/furniture';
 import type { Design, DesignDetail, FurniturePlacement } from '@/types';
 import { createId, delay } from '@/utils';
 
@@ -44,7 +45,7 @@ const merge = (design: Design, local: LocalDesignData | undefined): DesignDetail
     ...design,
     createdAt: design.createdAt ?? updatedAt,
     updatedAt,
-    // May chu chua luu duoc placements -> uu tien ban tren may
+    // Ban tren may giu ca noi that mau (may chu khong luu) -> uu tien ban tren may
     placements: local ? local.placements : (design.placements ?? []),
     roomImageUri: local?.roomImageUri ?? null,
   };
@@ -104,9 +105,15 @@ export const designApi = {
     return merge(design, local);
   },
 
-  /** Luu vi tri do. HIEN TAI: chi luu tren may (backend chua co API). */
+  /** Luu vi tri do: tren may, roi gui len may chu (PUT /api/designs/{id}). */
   async savePlacements(id: string, placements: FurniturePlacement[]): Promise<void> {
     await localStore.update(id, { placements });
+    if (USE_MOCK) return;
+    // id tam tren app (vd "pl-...") khong phai UUID -> khong gui, may chu tu tao id moi
+    const body = placements
+      .filter((p) => !isSampleFurnitureId(p.furnitureId))
+      .map(({ furnitureId, x, y, rotation, scale }) => ({ furnitureId, x, y, rotation, scale }));
+    await apiClient.put<Design>(`/designs/${id}`, { placements: body });
   },
 
   async remove(id: string): Promise<void> {

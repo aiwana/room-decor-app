@@ -38,6 +38,8 @@ interface PlacedItemProps {
   placement: FurniturePlacement;
   furniture: Furniture | undefined;
   frame: FrameSize;
+  /** Kich thuoc (px) khi scale = 1. Bo trong = uoc luong theo anh phong (baseSizeOf) */
+  size?: { w: number; h: number };
   selected: boolean;
   onSelect: (id: string) => void;
   onChange: (id: string, patch: PlacementPatch) => void;
@@ -60,8 +62,8 @@ const clampWorklet = (v: number, min: number, max: number): number => {
   return Math.min(max, Math.max(min, v));
 };
 
-const PlacedItem: React.FC<PlacedItemProps> = ({ placement, furniture, frame, selected, onSelect, onChange }) => {
-  const { w, h } = baseSizeOf(furniture, frame);
+const PlacedItem: React.FC<PlacedItemProps> = ({ placement, furniture, frame, size, selected, onSelect, onChange }) => {
+  const { w, h } = size ?? baseSizeOf(furniture, frame);
 
   // Gia tri dang hien thi (px / radian), cap nhat lien tuc khi dang keo
   const cx = useSharedValue(placement.x * frame.width);
@@ -149,7 +151,7 @@ const PlacedItem: React.FC<PlacedItemProps> = ({ placement, furniture, frame, se
           <Image source={{ uri: furniture.thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="contain" />
         ) : (
           <>
-            <Ionicons name={getCategoryIcon(furniture?.category ?? '')} size={Math.min(w, h) * 0.4} color={COLORS.textPrimary} />
+            <Ionicons name={getCategoryIcon(furniture?.category ?? '')} size={Math.max(10, Math.min(w, h) * 0.4)} color={COLORS.textPrimary} />
             <Text style={styles.label} numberOfLines={1}>
               {furniture?.name ?? 'Món đồ'}
             </Text>

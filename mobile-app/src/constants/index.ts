@@ -52,4 +52,6 @@ export const STORAGE_KEYS = {
   /** Danh sach thiet ke gia (chi dung khi USE_MOCK) */
   MOCK_DESIGNS: 'roomdecor.mockDesigns',
   MOCK_USER: 'roomdecor.mockUser',
+  /** Mat bang gia theo roomImageId (chi dung khi USE_MOCK) */
+  MOCK_FLOOR_PLANS: 'roomdecor.mockFloorPlans',
 } as const;

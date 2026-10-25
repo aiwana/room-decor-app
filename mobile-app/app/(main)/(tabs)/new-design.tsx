@@ -6,7 +6,8 @@
  * Luong goi API:
  *   1. POST /api/room-images/upload (anh phong)  -> roomImageId
  *   2. POST /api/designs { name, roomImageId }     -> designId
- *   3. Chuyen sang /editor/[designId]
+ *   3. POST /api/ai/scan-room { roomImageId }       -> mat bang 2D (loi thi bo qua, quet lai trong editor)
+ *   4. Chuyen sang /editor/[designId]
  *
  * Nhan san anh tu Home qua params: imageUri, width, height.
  */
@@ -24,6 +25,7 @@ import { COLORS, RADIUS, SPACING } from '@/constants/colors';
 import { type PickedImage, useRoomImagePicker } from '@/hooks/useRoomImagePicker';
 import { getErrorMessage } from '@/services/api-error';
 import { designApi } from '@/services/design-api';
+import { floorPlanApi } from '@/services/floor-plan-api';
 import { roomImageApi } from '@/services/room-image-api';
 import { firstParam } from '@/utils';
 
@@ -31,12 +33,13 @@ const NAME_MAX = 200; // khop cot designs.name VARCHAR(200)
 
 const defaultName = (): string => `Phòng của tôi ${new Date().toLocaleDateString('vi-VN')}`;
 
-type Step = 'idle' | 'uploading' | 'creating';
+type Step = 'idle' | 'uploading' | 'creating' | 'scanning';
 
 const STEPS = [
   { icon: 'image-outline', text: 'Chọn hoặc chụp ảnh căn phòng' },
   { icon: 'create-outline', text: 'Đặt tên cho thiết kế' },
-  { icon: 'cube-outline', text: 'Kéo, xoay, phóng to nội thất lên ảnh' },
+  { icon: 'scan-outline', text: 'AI quét ảnh, dựng mặt bằng 2D của phòng' },
+  { icon: 'cube-outline', text: 'Kéo, xoay nội thất, xem trước bằng 3D' },
 ] as const;
 
 export default function NewDesignScreen() {
@@ -99,6 +102,9 @@ export default function NewDesignScreen() {
       const roomImage = await roomImageApi.upload(image.uri, image);
       setStep('creating');
       const design = await designApi.create({ name: trimmed, roomImageId: roomImage.id, roomImageUri: image.uri });
+      setStep('scanning');
+      // Quet loi khong chan nguoi dung: van mo trinh chinh sua, bam "Quét phòng bằng AI" de thu lai
+      await floorPlanApi.scan(roomImage.id).catch(() => undefined);
       reset();
       router.push({ pathname: '/editor/[id]', params: { id: design.id } });
     } catch (e) {
@@ -111,7 +117,13 @@ export default function NewDesignScreen() {
 
   const busy = step !== 'idle';
   const buttonTitle =
-    step === 'uploading' ? 'Đang tải ảnh lên...' : step === 'creating' ? 'Đang tạo thiết kế...' : 'Tạo thiết kế';
+    step === 'uploading'
+      ? 'Đang tải ảnh lên...'
+      : step === 'creating'
+        ? 'Đang tạo thiết kế...'
+        : step === 'scanning'
+          ? 'AI đang quét phòng...'
+          : 'Tạo thiết kế';
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -119,7 +131,7 @@ export default function NewDesignScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
             <Text style={styles.title}>Thiết kế mới</Text>
-            <Text style={styles.subtitle}>Chụp căn phòng, rồi đặt nội thất lên ảnh để xem trước.</Text>
+            <Text style={styles.subtitle}>Chụp căn phòng, AI dựng mặt bằng, rồi đặt nội thất và xem trước 3D.</Text>
           </View>
 
           <MockModeNotice />

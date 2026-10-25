@@ -53,9 +53,10 @@ export interface Furniture {
 }
 
 /**
- * PlacementDto: 1 mon do dat tren anh phong (trinh chinh sua 2D).
+ * PlacementDto: 1 mon do dat trong phong (trinh chinh sua).
  *   x, y     : vi tri TAM mon do, tinh theo ti le 0..1 cua khung anh phong
- *              (0,0 = goc tren trai, 1,1 = goc duoi phai) -> khong phu thuoc kich thuoc man hinh
+ *              (0,0 = goc tren trai, 1,1 = goc duoi phai) -> khong phu thuoc kich thuoc man hinh.
+ *              Tren mat bang 2D / 3D: x * roomWidth, y * roomDepth (met).
  *   rotation : goc xoay, don vi do (do), chieu kim dong ho
  *   scale    : ti le phong to (1 = kich thuoc mac dinh)
  */
@@ -88,6 +89,37 @@ export interface RoomImage {
   capturedAt: string;
 }
 
+/** WallDto: 1 doan tuong tren mat bang, toa do met (goc tren trai = 0,0) */
+export interface Wall {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+/**
+ * FloorPlanDto: mat bang 2D cua 1 anh phong, do AI quet ra (POST /api/ai/scan-room).
+ * Kich thuoc tinh bang MET. Moi anh phong co toi da 1 mat bang.
+ */
+export interface FloorPlan {
+  id: string;
+  roomImageId: string;
+  roomWidth: number;
+  roomDepth: number;
+  ceilingHeight: number;
+  walls: Wall[];
+  pixelsPerMeter: number;
+  description?: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/** ScanRoomResponse */
+export interface ScanResult {
+  floorPlan: FloorPlan;
+  description: string;
+}
+
 /** AiSuggestionResponse */
 export interface AiSuggestion {
   placements: FurniturePlacement[];
@@ -98,8 +130,8 @@ export interface AiSuggestion {
 
 /**
  * Thiet ke + du lieu luu tren may:
- *  - roomImageUri: anh phong tren may (backend chua phuc vu file anh)
- *  - placements  : vi tri do (backend chua co API luu)
+ *  - roomImageUri: anh phong tren may (hien nhanh, khong can tai lai tu may chu)
+ *  - placements  : vi tri do (luu tren may va gui len PUT /api/designs/{id})
  */
 export interface DesignDetail extends Design {
   createdAt: string;
