@@ -4,6 +4,7 @@ import com.roomdecor.dto.ai.*;
 import com.roomdecor.service.AiService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -17,6 +18,12 @@ public class AiController {
 
     public AiController(AiService aiService) {
         this.aiService = aiService;
+    }
+
+    @PostMapping("/scan-room")
+    public ResponseEntity<ScanRoomResponse> scanRoom(@Valid @RequestBody ScanRoomRequest request, Authentication auth) {
+        UUID userId = (UUID) auth.getPrincipal();
+        return ResponseEntity.ok(aiService.scanRoom(request.roomImageId(), userId));
     }
 
     @PostMapping("/suggest-layout")

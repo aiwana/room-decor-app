@@ -4,7 +4,7 @@ Spring Boot backend for the RoomDecor application.
 
 ## Tech Stack
 
-- **Java 21** + **Spring Boot 3.4**
+- **Java 17** (JDK 17 or newer) + **Spring Boot 3.4**
 - **PostgreSQL** + **Flyway** migrations
 - **Spring Security** + **JWT** authentication
 - **Lombok** for boilerplate reduction
@@ -54,6 +54,15 @@ The user and password are only applied when the volume is first created. If you 
 either change it inside the database too, or run `docker compose down -v` to start over with an empty database.
 Port 5433 can only be used by one container: if `room-decor-postgres` is running, do not start this one.
 
+## AI Room Scanning
+
+The AI scan feature uses a vision model to analyze a room photo and generate a 2D floor plan.
+
+- **Without API key**: Uses `MockVisionClient` — returns a default 4×4m rectangular room.
+- **With OpenAI key**: Set `OPENAI_API_KEY` env var to use GPT-4o Vision for real room analysis.
+
+The vision client is pluggable via the `RoomVisionClient` interface (`service/ai/`). To add a different provider (Gemini, custom CV model), implement this interface.
+
 ## API Endpoints
 
 Interactive docs (Swagger UI): http://localhost:8080/swagger-ui.html (click **Authorize** and paste the token from `/api/auth/login`).
@@ -75,5 +84,9 @@ Auth API details, error format and roles: [docs/api-auth.md](docs/api-auth.md).
 | POST | /api/room-images/upload | Upload room image | Yes |
 | GET | /api/room-images | List user's room images | Yes |
 | DELETE | /api/room-images/{id} | Delete room image | Yes |
+| POST | /api/ai/scan-room | AI scan room image → 2D floor plan | Yes |
+| GET | /api/floor-plans/{id} | Get floor plan by ID | Yes |
+| GET | /api/floor-plans/by-room-image/{roomImageId} | Get floor plan for a room image | Yes |
+| PUT | /api/floor-plans/{id} | Update floor plan (user corrections) | Yes |
 | POST | /api/ai/suggest-layout | Get AI layout suggestion | Yes |
 | POST | /api/ai/describe-room/{id} | Get AI room description | Yes |

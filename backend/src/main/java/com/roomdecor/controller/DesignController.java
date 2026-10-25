@@ -38,6 +38,12 @@ public class DesignController {
         return ResponseEntity.ok(designService.create(request, userId));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<DesignDto> update(@PathVariable UUID id, @Valid @RequestBody UpdateDesignRequest request, Authentication auth) {
+        UUID userId = (UUID) auth.getPrincipal();
+        return ResponseEntity.ok(designService.update(id, request, userId));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable UUID id, Authentication auth) {
         UUID userId = (UUID) auth.getPrincipal();
