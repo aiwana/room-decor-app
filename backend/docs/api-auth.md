@@ -167,6 +167,10 @@ Không có API để tự lên ADMIN (cố ý, để không ai tự cấp quyề
 2. Nâng quyền trong database:
 
    ```powershell
+   # Database started with docker compose (run from the backend folder)
+   docker compose exec postgres psql -U roomdecor_app -d roomdecor -c "UPDATE users SET role='ADMIN' WHERE email='admin@example.com';"
+
+   # Old room-decor-postgres container
    docker exec room-decor-postgres psql -U roomdecor_app -d roomdecor -c "UPDATE users SET role='ADMIN' WHERE email='admin@example.com';"
    ```
 
