@@ -21,7 +21,9 @@ public final class DesignMapper {
             d.getRoomImage() != null ? d.getRoomImage().getId() : null,
             placements,
             d.getCreatedAt(),
-            d.getUpdatedAt()
+            d.getUpdatedAt(),
+            d.getSceneJson(),
+            d.getPreviewImageUrl()
         );
     }
 

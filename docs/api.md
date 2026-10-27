@@ -5,7 +5,7 @@ Gốc: `http://localhost:8080` (máy ảo Android: `http://10.0.2.2:8080`). Gọ
 - **Token:** mọi API (trừ `/api/auth/**` và `/files/**`) cần header `Authorization: Bearer <token>`. Thiếu hoặc sai token thì trả **401**.
 - **Lỗi:** mọi lỗi trả cùng dạng `{ timestamp, status, message, errors? }`. Xem [api-auth.md](api-auth.md#4-định-dạng-lỗi-chung).
 - **Id:** đều là UUID dạng chuỗi.
-- **Quyền sở hữu:** người dùng chỉ đọc/sửa được thiết kế, ảnh, mặt bằng của chính mình. Truy cập của người khác trả **400** kèm `Access denied ...`.
+- **Quyền sở hữu:** thiết kế của người khác trả **403**; API ảnh/mặt bằng hiện trả **400** khi sai chủ sở hữu.
 
 ## Tài khoản (chi tiết ở [api-auth.md](api-auth.md))
 
@@ -17,6 +17,8 @@ Gốc: `http://localhost:8080` (máy ảo Android: `http://10.0.2.2:8080`). Gọ
 | GET | `/api/admin/users` | ADMIN | Danh sách tất cả tài khoản |
 
 ## Nội thất
+
+API thêm/sửa/xóa catalog và lưu scene JSON: xem [bàn giao người 2](api-catalog-design.md).
 
 | Phương thức | Đường dẫn | Mô tả |
 |---|---|---|

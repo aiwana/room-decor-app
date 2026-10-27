@@ -2,6 +2,9 @@
 
 Spring Boot backend for the RoomDecor application.
 
+Catalog CRUD, scene JSON storage and design ownership handoff (Vietnamese):
+[docs/api-catalog-design.md](../docs/api-catalog-design.md).
+
 ## Tech Stack
 
 - **Java 17** (JDK 17 or newer) + **Spring Boot 3.4**

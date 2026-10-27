@@ -1,6 +1,9 @@
 package com.roomdecor.entity;
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.databind.JsonNode;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -27,6 +30,13 @@ public class Design {
 
     @Column(nullable = false, length = 200)
     private String name;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "scene_json", columnDefinition = "jsonb")
+    private JsonNode sceneJson;
+
+    @Column(name = "preview_image_url", length = 2048)
+    private String previewImageUrl;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_image_id")
