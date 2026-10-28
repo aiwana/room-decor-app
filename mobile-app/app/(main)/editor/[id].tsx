@@ -30,6 +30,7 @@ import View3D from '@/components/design/View3D';
 import FurniturePicker from '@/components/editor/FurniturePicker';
 import PlacedItem, { MAX_SCALE, MIN_SCALE, type FrameSize } from '@/components/editor/PlacedItem';
 import RoomMaterialPicker from '@/components/editor/RoomMaterialPicker';
+import RoomSizeEditor, { type RoomSizeValues } from '@/components/editor/RoomSizeEditor';
 import { COLORS, RADIUS, SPACING } from '@/constants/colors';
 import {
   DEFAULT_FLOOR_MATERIAL,
@@ -41,7 +42,7 @@ import { useAsync } from '@/hooks/useAsync';
 import { aiApi } from '@/services/ai-api';
 import { getErrorMessage } from '@/services/api-error';
 import { designApi } from '@/services/design-api';
-import { floorPlanApi } from '@/services/floor-plan-api';
+import { floorPlanApi, rectangleWalls } from '@/services/floor-plan-api';
 import { furnitureApi } from '@/services/furniture-api';
 import type { DesignDetail, FloorPlan, Furniture, FurniturePlacement, IoniconName } from '@/types';
 import { clamp, createId, firstParam } from '@/utils';
@@ -52,6 +53,8 @@ const SCALE_STEP = 1.15;
 const CM_PER_M = 100;
 /** Mon do nho nhat tren mat bang (px) de van bam duoc */
 const MIN_PLAN_ITEM = 14;
+
+const round2 = (value: number): number => Math.round(value * 100) / 100;
 
 type ViewMode = 'photo' | 'plan' | '3d';
 
@@ -113,6 +116,7 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
   const [scanning, setScanning] = useState(false);
   const [floorMaterial, setFloorMaterial] = useState(design.floorMaterial ?? DEFAULT_FLOOR_MATERIAL);
   const [wallMaterial, setWallMaterial] = useState(design.wallMaterial ?? DEFAULT_WALL_MATERIAL);
+  const [sizeEditorOpen, setSizeEditorOpen] = useState(false);
 
   const furnitureById = useMemo(() => {
     const map = new Map<string, Furniture>();
@@ -252,6 +256,23 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
     }
   };
 
+  const handleSaveRoomSize = async (values: RoomSizeValues): Promise<void> => {
+    if (!floorPlan) return;
+    const ratioX = floorPlan.roomWidth > 0 ? values.roomWidth / floorPlan.roomWidth : 1;
+    const ratioY = floorPlan.roomDepth > 0 ? values.roomDepth / floorPlan.roomDepth : 1;
+    const walls =
+      floorPlan.walls.length > 0
+        ? floorPlan.walls.map((w) => ({
+            x1: round2(w.x1 * ratioX),
+            y1: round2(w.y1 * ratioY),
+            x2: round2(w.x2 * ratioX),
+            y2: round2(w.y2 * ratioY),
+          }))
+        : rectangleWalls(values.roomWidth, values.roomDepth);
+    const updated = await floorPlanApi.update(floorPlan, { ...values, walls });
+    setFloorPlan(updated);
+  };
+
   const onLayout = (e: LayoutChangeEvent): void => setContainerWidth(e.nativeEvent.layout.width);
 
   /* ---------------- Render ---------------- */
@@ -378,7 +399,7 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
           ) : null}
 
           {containerWidth > 0 && viewMode === '3d' && floorPlan ? (
-            <View style={[styles.frame, { height: containerWidth }]}>
+            <View style={[styles.frame, { height: Math.round(containerWidth * 0.75) }]}>
               <View3D
                 floorPlan={floorPlan}
                 placements={placements}
@@ -400,10 +421,24 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
 
         {viewMode !== 'photo' && floorPlan ? (
           <View style={styles.planInfo}>
-            <Text style={styles.planInfoText}>
-              {`Phòng ${floorPlan.roomWidth.toFixed(1)} × ${floorPlan.roomDepth.toFixed(1)} m, trần ${floorPlan.ceilingHeight.toFixed(1)} m`}
-              {floorPlan.description ? `\n${floorPlan.description}` : ''}
-            </Text>
+            <View style={styles.planInfoTextWrap}>
+              <Pressable
+                style={styles.sizeButton}
+                onPress={(): void => setSizeEditorOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Chỉnh kích thước phòng"
+              >
+                <Text style={styles.planInfoDim}>
+                  {`Phòng ${floorPlan.roomWidth.toFixed(1)} × ${floorPlan.roomDepth.toFixed(1)} m · trần ${floorPlan.ceilingHeight.toFixed(1)} m`}
+                </Text>
+                <Ionicons name="create-outline" size={14} color={COLORS.accent} />
+              </Pressable>
+              {floorPlan.description ? (
+                <Text style={styles.planInfoDesc} numberOfLines={2}>
+                  {floorPlan.description}
+                </Text>
+              ) : null}
+            </View>
             <Button title="Quét lại" iconName="scan-outline" variant="ghost" onPress={handleScan} loading={scanning} style={styles.rescan} />
           </View>
         ) : null}
@@ -473,6 +508,15 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
         />
       </View>
 
+      {floorPlan ? (
+        <RoomSizeEditor
+          visible={sizeEditorOpen}
+          floorPlan={floorPlan}
+          onClose={(): void => setSizeEditorOpen(false)}
+          onSave={handleSaveRoomSize}
+        />
+      ) : null}
+
       <FurniturePicker visible={pickerOpen} onClose={(): void => setPickerOpen(false)} onPick={addFurniture} />
     </View>
   );
@@ -516,8 +560,11 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.md,
     marginTop: SPACING.sm,
   },
-  planInfoText: { flex: 1, fontSize: 12, color: COLORS.textSecondary, lineHeight: 17 },
-  rescan: { paddingHorizontal: SPACING.sm },
+  planInfoTextWrap: { flex: 1, gap: 2 },
+  sizeButton: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6 },
+  planInfoDim: { fontSize: 12, fontWeight: '600', color: COLORS.textPrimary },
+  planInfoDesc: { fontSize: 11, color: COLORS.textSecondary, lineHeight: 16 },
+  rescan: { height: 36, paddingHorizontal: SPACING.sm },
   noImage: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', padding: SPACING.md },
   noImageText: { marginTop: SPACING.sm, fontSize: 13, color: COLORS.textSecondary, textAlign: 'center' },
   tip: { fontSize: 12, color: COLORS.textSecondary, textAlign: 'center', marginTop: SPACING.sm, paddingHorizontal: SPACING.md },

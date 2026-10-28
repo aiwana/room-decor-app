@@ -5,7 +5,10 @@
  */
 import { useCallback } from 'react';
 import { Alert, Linking } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
+
+import { createId } from '@/utils';
 
 export interface PickedImage {
   uri: string;
@@ -32,6 +35,29 @@ const toPicked = (result: ImagePicker.ImagePickerResult): PickedImage | null => 
   return asset ? { uri: asset.uri, width: asset.width, height: asset.height } : null;
 };
 
+const IMAGE_DIR = FileSystem.documentDirectory ? `${FileSystem.documentDirectory}room-images/` : null;
+
+/**
+ * Expo Go (va he dieu hanh) co the xoa file tam cua ImagePicker, lam preview/upload
+ * mat anh sau khi app reload. Copy sang documentDirectory de giu anh on dinh.
+ */
+const persistPicked = async (picked: PickedImage): Promise<PickedImage> => {
+  if (!IMAGE_DIR) return picked;
+  try {
+    const info = await FileSystem.getInfoAsync(IMAGE_DIR);
+    if (!info.exists) {
+      await FileSystem.makeDirectoryAsync(IMAGE_DIR, { intermediates: true });
+    }
+    const ext = /\.([a-zA-Z0-9]+)(?:\?|$)/.exec(picked.uri)?.[1]?.toLowerCase() ?? 'jpg';
+    const target = `${IMAGE_DIR}${createId('room')}.${ext}`;
+    await FileSystem.copyAsync({ from: picked.uri, to: target });
+    return { ...picked, uri: target };
+  } catch (e) {
+    if (__DEV__) console.warn('[RoomImage] persist failed', e);
+    return picked;
+  }
+};
+
 export const useRoomImagePicker = (): {
   pickFromCamera: () => Promise<PickedImage | null>;
   pickFromGallery: () => Promise<PickedImage | null>;
@@ -42,7 +68,8 @@ export const useRoomImagePicker = (): {
       showPermissionAlert('camera');
       return null;
     }
-    return toPicked(await ImagePicker.launchCameraAsync(PICKER_OPTIONS));
+    const picked = toPicked(await ImagePicker.launchCameraAsync(PICKER_OPTIONS));
+    return picked ? persistPicked(picked) : null;
   }, []);
 
   const pickFromGallery = useCallback(async (): Promise<PickedImage | null> => {
@@ -51,7 +78,8 @@ export const useRoomImagePicker = (): {
       showPermissionAlert('thư viện ảnh');
       return null;
     }
-    return toPicked(await ImagePicker.launchImageLibraryAsync(PICKER_OPTIONS));
+    const picked = toPicked(await ImagePicker.launchImageLibraryAsync(PICKER_OPTIONS));
+    return picked ? persistPicked(picked) : null;
   }, []);
 
   return { pickFromCamera, pickFromGallery };

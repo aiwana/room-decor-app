@@ -15,13 +15,20 @@ interface ImagePickerBoxProps {
   onPickCamera: () => void;
   onPickGallery: () => void;
   onClear: () => void;
+  onImageError?: () => void;
 }
 
-const ImagePickerBox: React.FC<ImagePickerBoxProps> = ({ imageUri, onPickCamera, onPickGallery, onClear }) => {
+const ImagePickerBox: React.FC<ImagePickerBoxProps> = ({
+  imageUri,
+  onPickCamera,
+  onPickGallery,
+  onClear,
+  onImageError,
+}) => {
   if (imageUri) {
     return (
       <View style={styles.previewWrap}>
-        <Image source={{ uri: imageUri }} style={styles.preview} contentFit="cover" />
+        <Image source={{ uri: imageUri }} style={styles.preview} contentFit="cover" onError={onImageError} />
         <View style={styles.previewActions}>
           <Pressable style={styles.smallBtn} onPress={onPickGallery} accessibilityLabel="Đổi ảnh">
             <Ionicons name="swap-horizontal" size={16} color={COLORS.textPrimary} />
