@@ -16,7 +16,7 @@
  * va mo tren man hinh khac kich thuoc van dung cho.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -29,7 +29,14 @@ import FloorPlanBackground from '@/components/design/FloorPlanBackground';
 import View3D from '@/components/design/View3D';
 import FurniturePicker from '@/components/editor/FurniturePicker';
 import PlacedItem, { MAX_SCALE, MIN_SCALE, type FrameSize } from '@/components/editor/PlacedItem';
+import RoomMaterialPicker from '@/components/editor/RoomMaterialPicker';
 import { COLORS, RADIUS, SPACING } from '@/constants/colors';
+import {
+  DEFAULT_FLOOR_MATERIAL,
+  DEFAULT_WALL_MATERIAL,
+  getFloorColor,
+  getWallColor,
+} from '@/constants/materials';
 import { useAsync } from '@/hooks/useAsync';
 import { aiApi } from '@/services/ai-api';
 import { getErrorMessage } from '@/services/api-error';
@@ -104,6 +111,8 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('photo');
   const [floorPlan, setFloorPlan] = useState<FloorPlan | null>(initialFloorPlan);
   const [scanning, setScanning] = useState(false);
+  const [floorMaterial, setFloorMaterial] = useState(design.floorMaterial ?? DEFAULT_FLOOR_MATERIAL);
+  const [wallMaterial, setWallMaterial] = useState(design.wallMaterial ?? DEFAULT_WALL_MATERIAL);
 
   const furnitureById = useMemo(() => {
     const map = new Map<string, Furniture>();
@@ -234,7 +243,7 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
   const handleSave = async (): Promise<void> => {
     setSaving(true);
     try {
-      await designApi.savePlacements(design.id, placements);
+      await designApi.savePlacements(design.id, placements, { floorMaterial, wallMaterial });
       setDirty(false);
     } catch (e) {
       Alert.alert('Không lưu được thiết kế', getErrorMessage(e));
@@ -261,7 +270,7 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
         }}
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} scrollEnabled={!selectedId && viewMode !== '3d'}>
+      <View style={styles.body}>
         <MockModeNotice />
 
         {/* ===== Chon che do xem ===== */}
@@ -280,30 +289,47 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
           ))}
         </View>
 
+        <View style={styles.materialPicker}>
+          <RoomMaterialPicker
+            floorMaterial={floorMaterial}
+            wallMaterial={wallMaterial}
+            onChangeFloor={(id): void => {
+              setFloorMaterial(id);
+              setDirty(true);
+            }}
+            onChangeWall={(id): void => {
+              setWallMaterial(id);
+              setDirty(true);
+            }}
+          />
+        </View>
+
         {/* ===== Khung anh phong / mat bang / 3D + do ===== */}
         <View style={styles.frameWrap} onLayout={onLayout}>
           {containerWidth > 0 && viewMode === 'photo' ? (
-            <Pressable
-              style={[styles.frame, { height: photoFrame.height }]}
-              onPress={(): void => setSelectedId(null)}
-              accessibilityLabel="Ảnh căn phòng"
-            >
-              {design.roomImageUri ? (
-                <Image
-                  source={{ uri: design.roomImageUri }}
-                  style={StyleSheet.absoluteFill}
-                  contentFit="cover"
-                  onLoad={(e): void => {
-                    const { width, height } = e.source;
-                    if (width > 0 && height > 0) setRatio(clamp(width / height, 0.5, 2));
-                  }}
-                />
-              ) : (
-                <View style={styles.noImage}>
-                  <Ionicons name="image-outline" size={40} color={COLORS.inactive} />
-                  <Text style={styles.noImageText}>Máy này không có ảnh phòng của thiết kế.</Text>
-                </View>
-              )}
+            <View style={[styles.frame, { height: photoFrame.height }]}>
+              <Pressable
+                style={StyleSheet.absoluteFill}
+                onPress={(): void => setSelectedId(null)}
+                accessibilityLabel="Ảnh căn phòng"
+              >
+                {design.roomImageUri ? (
+                  <Image
+                    source={{ uri: design.roomImageUri }}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                    onLoad={(e): void => {
+                      const { width, height } = e.source;
+                      if (width > 0 && height > 0) setRatio(clamp(width / height, 0.5, 2));
+                    }}
+                  />
+                ) : (
+                  <View style={styles.noImage}>
+                    <Ionicons name="image-outline" size={40} color={COLORS.inactive} />
+                    <Text style={styles.noImageText}>Máy này không có ảnh phòng của thiết kế.</Text>
+                  </View>
+                )}
+              </Pressable>
               {placements.map((p) => (
                 <PlacedItem
                   key={p.id}
@@ -315,16 +341,24 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
                   onChange={handleChange}
                 />
               ))}
-            </Pressable>
+            </View>
           ) : null}
 
           {containerWidth > 0 && viewMode === 'plan' && floorPlan && planFrame ? (
-            <Pressable
-              style={[styles.frame, { height: planFrame.height }]}
-              onPress={(): void => setSelectedId(null)}
-              accessibilityLabel="Mặt bằng 2D của phòng"
-            >
-              <FloorPlanBackground floorPlan={floorPlan} width={planFrame.width} height={planFrame.height} />
+            <View style={[styles.frame, { height: planFrame.height }]}>
+              <Pressable
+                style={StyleSheet.absoluteFill}
+                onPress={(): void => setSelectedId(null)}
+                accessibilityLabel="Mặt bằng 2D của phòng"
+              >
+                <FloorPlanBackground
+                  floorPlan={floorPlan}
+                  width={planFrame.width}
+                  height={planFrame.height}
+                  floorColor={getFloorColor(floorMaterial)}
+                  wallColor={getWallColor(wallMaterial)}
+                />
+              </Pressable>
               {placements.map((p) => {
                 const item = furnitureById.get(p.furnitureId);
                 return (
@@ -340,12 +374,18 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
                   />
                 );
               })}
-            </Pressable>
+            </View>
           ) : null}
 
           {containerWidth > 0 && viewMode === '3d' && floorPlan ? (
             <View style={[styles.frame, { height: containerWidth }]}>
-              <View3D floorPlan={floorPlan} placements={placements} furnitureById={furnitureById} />
+              <View3D
+                floorPlan={floorPlan}
+                placements={placements}
+                furnitureById={furnitureById}
+                floorMaterial={floorMaterial}
+                wallMaterial={wallMaterial}
+              />
             </View>
           ) : null}
 
@@ -386,31 +426,31 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
           </View>
         ) : null}
 
-        {/* ===== Thanh dieu khien mon dang chon ===== */}
-        {selected ? (
-          <View style={styles.selectedBar}>
-            <Text style={styles.selectedName} numberOfLines={1}>
-              {furnitureById.get(selected.furnitureId)?.name ?? 'Món đồ'}
-            </Text>
-            <View style={styles.selectedActions}>
-              <ToolButton icon="refresh" label="Xoay" onPress={(): void => patchSelected((p) => ({ rotation: (p.rotation + 45) % 360 }))} />
-              <ToolButton
-                icon="remove"
-                label="Nhỏ"
-                onPress={(): void => patchSelected((p) => ({ scale: clamp(p.scale / SCALE_STEP, MIN_SCALE, MAX_SCALE) }))}
-              />
-              <ToolButton
-                icon="add"
-                label="To"
-                onPress={(): void => patchSelected((p) => ({ scale: clamp(p.scale * SCALE_STEP, MIN_SCALE, MAX_SCALE) }))}
-              />
-              <ToolButton icon="trash-outline" label="Xoá" danger onPress={removeSelected} />
-            </View>
-          </View>
-        ) : null}
-
         <Text style={styles.count}>{placements.length} món đồ trong thiết kế</Text>
-      </ScrollView>
+      </View>
+
+      {/* ===== Thanh dieu khien mon dang chon (co dinh, khong bi cat) ===== */}
+      {selected ? (
+        <View style={styles.selectedBar}>
+          <Text style={styles.selectedName} numberOfLines={1}>
+            {furnitureById.get(selected.furnitureId)?.name ?? 'Món đồ'}
+          </Text>
+          <View style={styles.selectedActions}>
+            <ToolButton icon="refresh" label="Xoay" onPress={(): void => patchSelected((p) => ({ rotation: (p.rotation + 45) % 360 }))} />
+            <ToolButton
+              icon="remove"
+              label="Nhỏ"
+              onPress={(): void => patchSelected((p) => ({ scale: clamp(p.scale / SCALE_STEP, MIN_SCALE, MAX_SCALE) }))}
+            />
+            <ToolButton
+              icon="add"
+              label="To"
+              onPress={(): void => patchSelected((p) => ({ scale: clamp(p.scale * SCALE_STEP, MIN_SCALE, MAX_SCALE) }))}
+            />
+            <ToolButton icon="trash-outline" label="Xoá" danger onPress={removeSelected} />
+          </View>
+        </View>
+      ) : null}
 
       {/* ===== Thanh cong cu duoi ===== */}
       <View style={styles.toolbar}>
@@ -454,12 +494,13 @@ const ToolButton: React.FC<ToolButtonProps> = ({ icon, label, onPress, danger })
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
-  scrollContent: { paddingTop: SPACING.sm, paddingBottom: SPACING.lg },
+  body: { flex: 1, overflow: 'hidden', paddingTop: SPACING.sm, paddingBottom: SPACING.lg },
   headerSave: { fontSize: 15, fontWeight: '700', color: COLORS.accent },
   headerSaveDisabled: { color: COLORS.inactive },
   frameWrap: { marginHorizontal: SPACING.md, borderRadius: RADIUS.lg, overflow: 'hidden' },
   frame: { width: '100%', backgroundColor: COLORS.surfaceAlt, overflow: 'hidden' },
   modes: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, paddingHorizontal: SPACING.md, marginBottom: SPACING.sm },
+  materialPicker: { marginHorizontal: SPACING.md, marginBottom: SPACING.sm },
   noPlan: {
     alignItems: 'center',
     gap: SPACING.md,

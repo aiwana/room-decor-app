@@ -12,7 +12,7 @@ import java.util.List;
 public class MockVisionClient implements RoomVisionClient {
 
     @Override
-    public RoomAnalysisResult analyze(String imageUrl) {
+    public RoomAnalysisResult analyze(ImageInput input) {
         // Default rectangular room: 4m x 4m, 2.7m ceiling
         double w = 4.0;
         double d = 4.0;

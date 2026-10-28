@@ -12,6 +12,7 @@ import com.roomdecor.mapper.FloorPlanMapper;
 import com.roomdecor.repository.FloorPlanRepository;
 import com.roomdecor.repository.RoomImageRepository;
 import com.roomdecor.service.ai.RoomVisionClient;
+import com.roomdecor.storage.StorageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,15 +30,18 @@ public class AiService {
     private final FloorPlanRepository floorPlanRepository;
     private final FloorPlanService floorPlanService;
     private final RoomVisionClient visionClient;
+    private final StorageService storageService;
 
     public AiService(RoomImageRepository roomImageRepository,
                      FloorPlanRepository floorPlanRepository,
                      FloorPlanService floorPlanService,
-                     RoomVisionClient visionClient) {
+                     RoomVisionClient visionClient,
+                     StorageService storageService) {
         this.roomImageRepository = roomImageRepository;
         this.floorPlanRepository = floorPlanRepository;
         this.floorPlanService = floorPlanService;
         this.visionClient = visionClient;
+        this.storageService = storageService;
     }
 
     /**
@@ -58,8 +62,12 @@ public class AiService {
             floorPlanRepository.flush();
         });
 
-        // Call AI vision provider
-        RoomVisionClient.RoomAnalysisResult result = visionClient.analyze(image.getUrl());
+        // Read the local upload and send it inline so localhost/LAN URLs do not need to be public.
+        byte[] imageBytes = storageService.readImageBytes(image.getUrl());
+        String mimeType = storageService.imageMimeType(image.getUrl());
+        RoomVisionClient.RoomAnalysisResult result = visionClient.analyze(
+            new RoomVisionClient.ImageInput(image.getUrl(), imageBytes, mimeType)
+        );
 
         // Persist the floor plan
         var fp = floorPlanService.createFromScan(image, result, DEFAULT_PIXELS_PER_METER);

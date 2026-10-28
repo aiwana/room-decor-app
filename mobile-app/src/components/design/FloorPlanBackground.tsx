@@ -18,9 +18,17 @@ interface FloorPlanBackgroundProps {
   /** Kich thuoc khung (px); ti le phai bang roomWidth / roomDepth */
   width: number;
   height: number;
+  floorColor?: string;
+  wallColor?: string;
 }
 
-const FloorPlanBackground: React.FC<FloorPlanBackgroundProps> = ({ floorPlan, width, height }) => {
+const FloorPlanBackground: React.FC<FloorPlanBackgroundProps> = ({
+  floorPlan,
+  width,
+  height,
+  floorColor,
+  wallColor,
+}) => {
   const sx = width / floorPlan.roomWidth; // px moi met theo chieu ngang
   const sy = height / floorPlan.roomDepth;
   const cols = Math.floor(floorPlan.roomWidth);
@@ -28,14 +36,14 @@ const FloorPlanBackground: React.FC<FloorPlanBackgroundProps> = ({ floorPlan, wi
 
   return (
     <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
-      <Rect x={0} y={0} width={width} height={height} fill="#2B2A28" />
+      <Rect x={0} y={0} width={width} height={height} fill={floorColor ?? '#2B2A28'} />
 
       {/* Luoi 1 met */}
       {Array.from({ length: cols + 1 }, (_, i) => (
-        <Line key={`v${i}`} x1={i * sx} y1={0} x2={i * sx} y2={height} stroke={COLORS.border} strokeWidth={1} />
+        <Line key={`v${i}`} x1={i * sx} y1={0} x2={i * sx} y2={height} stroke="rgba(128,128,128,0.35)" strokeWidth={1} />
       ))}
       {Array.from({ length: rows + 1 }, (_, i) => (
-        <Line key={`h${i}`} x1={0} y1={i * sy} x2={width} y2={i * sy} stroke={COLORS.border} strokeWidth={1} />
+        <Line key={`h${i}`} x1={0} y1={i * sy} x2={width} y2={i * sy} stroke="rgba(128,128,128,0.35)" strokeWidth={1} />
       ))}
 
       {/* Tuong */}
@@ -46,7 +54,7 @@ const FloorPlanBackground: React.FC<FloorPlanBackgroundProps> = ({ floorPlan, wi
           y1={w.y1 * sy}
           x2={w.x2 * sx}
           y2={w.y2 * sy}
-          stroke={COLORS.textSecondary}
+          stroke={wallColor ?? COLORS.textSecondary}
           strokeWidth={5}
           strokeLinecap="round"
         />

@@ -32,6 +32,14 @@ public class Design {
     @JoinColumn(name = "room_image_id")
     private RoomImage roomImage;
 
+    @Column(name = "floor_material", nullable = false, length = 50)
+    @Builder.Default
+    private String floorMaterial = "wood";
+
+    @Column(name = "wall_material", nullable = false, length = 50)
+    @Builder.Default
+    private String wallMaterial = "white";
+
     @OneToMany(
         mappedBy = "design",
         cascade = CascadeType.ALL,

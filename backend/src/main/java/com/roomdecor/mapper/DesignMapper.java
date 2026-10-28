@@ -19,6 +19,8 @@ public final class DesignMapper {
             d.getId(),
             d.getName(),
             d.getRoomImage() != null ? d.getRoomImage().getId() : null,
+            d.getFloorMaterial(),
+            d.getWallMaterial(),
             placements,
             d.getCreatedAt(),
             d.getUpdatedAt()

@@ -13,10 +13,12 @@ public interface RoomVisionClient {
     /**
      * Analyze a room image and produce floor plan data.
      *
-     * @param imageUrl public URL of the room photo
+     * @param input image bytes plus the original URL/mime type
      * @return analysis result with walls, dimensions, description
      */
-    RoomAnalysisResult analyze(String imageUrl);
+    RoomAnalysisResult analyze(ImageInput input);
+
+    record ImageInput(String url, byte[] bytes, String mimeType) {}
 
     record RoomAnalysisResult(
         double roomWidthMeters,

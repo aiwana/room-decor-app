@@ -74,6 +74,9 @@ export interface Design {
   id: string;
   name: string;
   roomImageId: string | null;
+  /** Ma vat lieu san/tuong, xem src/constants/materials.ts */
+  floorMaterial?: string | null;
+  wallMaterial?: string | null;
   placements: FurniturePlacement[];
   /** Co the null ngay sau khi tao (backend chua dien) */
   createdAt: string | null;

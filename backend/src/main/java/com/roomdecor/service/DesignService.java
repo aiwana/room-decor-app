@@ -74,6 +74,12 @@ public class DesignService {
         if (request.name() != null && !request.name().isBlank()) {
             design.setName(request.name());
         }
+        if (request.floorMaterial() != null && !request.floorMaterial().isBlank()) {
+            design.setFloorMaterial(request.floorMaterial());
+        }
+        if (request.wallMaterial() != null && !request.wallMaterial().isBlank()) {
+            design.setWallMaterial(request.wallMaterial());
+        }
 
         if (request.placements() != null) {
             // Clear existing placements and add the new set

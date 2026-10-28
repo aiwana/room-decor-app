@@ -46,12 +46,12 @@ export default function SettingsScreen() {
       </View>
       <Text style={styles.hint}>
         Đổi bằng file mobile-app/.env (EXPO_PUBLIC_USE_MOCK, EXPO_PUBLIC_API_URL) rồi chạy lại `npx expo start -c`.
-        Điện thoại thật phải dùng IP LAN của máy tính, không dùng localhost hay 10.0.2.2.
+        Điện thoại thật dùng IP LAN của máy tính, hoặc localhost + `adb reverse` khi Wi-Fi chặn cổng.
       </Text>
 
       <Text style={styles.section}>Lưu trữ</Text>
       <View style={styles.card}>
-        <Row label="Vị trí nội thất" value="Lưu trên máy này (máy chủ chưa có API lưu)" />
+        <Row label="Vị trí nội thất" value="Lưu trên máy và máy chủ khi bấm Lưu" />
         <Row label="Ảnh phòng" value="Tải lên máy chủ, hiển thị bằng bản trên máy" />
       </View>
 

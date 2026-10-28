@@ -15,7 +15,7 @@ public class StorageConfig {
     private String baseUrl;
 
     public Path getUploadPath() {
-        return Path.of(uploadDir);
+        return Path.of(uploadDir).toAbsolutePath().normalize();
     }
 
     public String getBaseUrl() {
