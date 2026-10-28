@@ -8,6 +8,9 @@ public record DesignDto(
     UUID id,
     String name,
     UUID roomImageId,
+    String floorMaterial,
+    String wallMaterial,
+    String skirtingMaterial,
     List<PlacementDto> placements,
     Instant createdAt,
     Instant updatedAt

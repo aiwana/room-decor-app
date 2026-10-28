@@ -17,7 +17,7 @@ import { useAsync } from '@/hooks/useAsync';
 import { isSampleFurnitureId } from '@/mock/furniture';
 import { getErrorMessage } from '@/services/api-error';
 import { furnitureApi } from '@/services/furniture-api';
-import { firstParam } from '@/utils';
+import { firstParam, formatPrice } from '@/utils';
 
 const DimensionBox: React.FC<{ label: string; value: number }> = ({ label, value }) => (
   <View style={styles.dimBox}>
@@ -46,6 +46,15 @@ export default function FurnitureDetailScreen() {
           {isSampleFurnitureId(item.id) ? <Text style={styles.sample}>Mẫu</Text> : null}
         </View>
         <Text style={styles.name}>{item.name}</Text>
+
+        <View style={styles.priceRow}>
+          <Text style={styles.price}>{formatPrice(item.price, item.currency ?? 'VND')}</Text>
+          {item.vendorName ? <Text style={styles.vendor}>{item.vendorName}</Text> : null}
+        </View>
+        {item.style || item.material ? (
+          <Text style={styles.meta}>{[item.style, item.material].filter(Boolean).join(' · ')}</Text>
+        ) : null}
+        <Text style={styles.stock}>{item.stockStatus === 'in_stock' ? 'Còn hàng' : 'Liên hệ tồn kho'}</Text>
 
         <Text style={styles.section}>Kích thước</Text>
         <View style={styles.dims}>
@@ -89,6 +98,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   name: { fontSize: 22, fontWeight: 'bold', color: COLORS.textPrimary, marginTop: 6 },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginTop: 8 },
+  price: { fontSize: 22, fontWeight: '700', color: COLORS.accent },
+  vendor: { flex: 1, textAlign: 'right', fontSize: 13, color: COLORS.textSecondary },
+  meta: { fontSize: 13, color: COLORS.textSecondary, marginTop: 4 },
+  stock: { fontSize: 12, fontWeight: '600', color: COLORS.success, marginTop: 4 },
   section: { fontSize: 15, fontWeight: '700', color: COLORS.textPrimary, marginTop: SPACING.lg, marginBottom: SPACING.sm },
   dims: { flexDirection: 'row', gap: 12 },
   dimBox: { flex: 1, padding: 12, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, alignItems: 'center' },

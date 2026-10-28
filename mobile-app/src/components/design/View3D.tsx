@@ -14,6 +14,7 @@ import { StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import { COLORS } from '@/constants/colors';
+import { getFloorColor, getWallColor } from '@/constants/materials';
 import type { FloorPlan, Furniture, FurniturePlacement } from '@/types';
 
 const THREE_VERSION = '0.169.0';
@@ -23,6 +24,8 @@ interface View3DProps {
   floorPlan: FloorPlan;
   placements: FurniturePlacement[];
   furnitureById: Map<string, Furniture>;
+  floorMaterial?: string;
+  wallMaterial?: string;
 }
 
 interface SceneBox {
@@ -34,9 +37,17 @@ interface SceneBox {
   rotation: number;
 }
 
-const buildScene = (floorPlan: FloorPlan, placements: FurniturePlacement[], furnitureById: Map<string, Furniture>) => ({
+const buildScene = (
+  floorPlan: FloorPlan,
+  placements: FurniturePlacement[],
+  furnitureById: Map<string, Furniture>,
+  floorMaterial?: string,
+  wallMaterial?: string,
+) => ({
   room: { width: floorPlan.roomWidth, depth: floorPlan.roomDepth, height: floorPlan.ceilingHeight },
   walls: floorPlan.walls,
+  floorColor: getFloorColor(floorMaterial),
+  wallColor: getWallColor(wallMaterial),
   boxes: placements.flatMap((p): SceneBox[] => {
     const f = furnitureById.get(p.furnitureId);
     if (!f) return [];
@@ -92,14 +103,26 @@ sun.position.set(W, H * 3, D);
 sun.castShadow = true;
 scene.add(sun);
 
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ color: 0xd4c5a9 }));
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ color: data.floorColor, roughness: 0.75 }));
 floor.rotation.x = -Math.PI / 2;
 floor.position.set(W / 2, 0, D / 2);
 floor.receiveShadow = true;
 scene.add(floor);
 
+// Duong ke 1m de nhin ro gach/vat lieu san
+const gridPoints = [];
+for (let x = 1; x < W; x++) gridPoints.push(new THREE.Vector3(x, 0.003, 0), new THREE.Vector3(x, 0.003, D));
+for (let z = 1; z < D; z++) gridPoints.push(new THREE.Vector3(0, 0.003, z), new THREE.Vector3(W, 0.003, z));
+if (gridPoints.length) {
+  const grid = new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(gridPoints),
+    new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.12 })
+  );
+  scene.add(grid);
+}
+
 // Tuong hoi trong suot de nhin thay noi that tu moi goc
-const wallMat = new THREE.MeshStandardMaterial({ color: 0xe8e0d0, transparent: true, opacity: 0.35, depthWrite: false });
+const wallMat = new THREE.MeshStandardMaterial({ color: data.wallColor, transparent: true, opacity: 0.35, depthWrite: false });
 for (const w of data.walls) {
   const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
   const wall = new THREE.Mesh(new THREE.BoxGeometry(len, H, 0.08), wallMat);
@@ -130,10 +153,16 @@ renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, came
 </script>
 </body></html>`;
 
-const View3D: React.FC<View3DProps> = ({ floorPlan, placements, furnitureById }) => {
+const View3D: React.FC<View3DProps> = ({
+  floorPlan,
+  placements,
+  furnitureById,
+  floorMaterial,
+  wallMaterial,
+}) => {
   const html = useMemo(
-    () => buildHtml(buildScene(floorPlan, placements, furnitureById)),
-    [floorPlan, placements, furnitureById],
+    () => buildHtml(buildScene(floorPlan, placements, furnitureById, floorMaterial, wallMaterial)),
+    [floorPlan, placements, furnitureById, floorMaterial, wallMaterial],
   );
 
   return (

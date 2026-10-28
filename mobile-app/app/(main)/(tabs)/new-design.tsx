@@ -76,11 +76,16 @@ export default function NewDesignScreen() {
     }
   };
 
-  const reset = (): void => {
+  const clearImage = (): void => {
     setImage(null);
+    setError(null);
+    router.setParams({ imageUri: '', width: '', height: '' });
+  };
+
+  const reset = (): void => {
+    clearImage();
     setName(defaultName());
     setStep('idle');
-    router.setParams({ imageUri: undefined, width: undefined, height: undefined });
   };
 
   const handleCreate = async (): Promise<void> => {
@@ -141,6 +146,7 @@ export default function NewDesignScreen() {
             onPickCamera={(): void => void pick('camera')}
             onPickGallery={(): void => void pick('gallery')}
             onClear={reset}
+            onImageError={clearImage}
           />
 
           {image ? (

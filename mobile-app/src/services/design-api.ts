@@ -12,6 +12,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { MOCK_DELAY, STORAGE_KEYS, USE_MOCK } from '@/constants';
+import { DEFAULT_SKIRTING_MATERIAL } from '@/constants/materials';
 import { isSampleFurnitureId } from '@/mock/furniture';
 import type { Design, DesignDetail, FurniturePlacement } from '@/types';
 import { createId, delay } from '@/utils';
@@ -48,6 +49,10 @@ const merge = (design: Design, local: LocalDesignData | undefined): DesignDetail
     // Ban tren may giu ca noi that mau (may chu khong luu) -> uu tien ban tren may
     placements: local ? local.placements : (design.placements ?? []),
     roomImageUri: local?.roomImageUri ?? null,
+    floorMaterial: local?.floorMaterial ?? design.floorMaterial ?? 'wood',
+    wallMaterial: local?.wallMaterial ?? design.wallMaterial ?? 'white',
+    skirtingMaterial:
+      local?.skirtingMaterial ?? design.skirtingMaterial ?? DEFAULT_SKIRTING_MATERIAL,
   };
 };
 
@@ -91,6 +96,9 @@ export const designApi = {
         id: createId('design'),
         name: input.name,
         roomImageId: input.roomImageId,
+        floorMaterial: 'wood',
+        wallMaterial: 'white',
+        skirtingMaterial: DEFAULT_SKIRTING_MATERIAL,
         placements: [],
         createdAt: now,
         updatedAt: now,
@@ -105,15 +113,25 @@ export const designApi = {
     return merge(design, local);
   },
 
-  /** Luu vi tri do: tren may, roi gui len may chu (PUT /api/designs/{id}). */
-  async savePlacements(id: string, placements: FurniturePlacement[]): Promise<void> {
-    await localStore.update(id, { placements });
+  /** Luu vi tri do + vat lieu: tren may, roi gui len may chu (PUT /api/designs/{id}). */
+  async savePlacements(
+    id: string,
+    placements: FurniturePlacement[],
+    materials?: { floorMaterial: string; wallMaterial: string; skirtingMaterial: string },
+  ): Promise<void> {
+    await localStore.update(id, { placements, ...materials });
     if (USE_MOCK) return;
     // id tam tren app (vd "pl-...") khong phai UUID -> khong gui, may chu tu tao id moi
     const body = placements
       .filter((p) => !isSampleFurnitureId(p.furnitureId))
       .map(({ furnitureId, x, y, rotation, scale }) => ({ furnitureId, x, y, rotation, scale }));
-    await apiClient.put<Design>(`/designs/${id}`, { placements: body });
+    const payload: Record<string, unknown> = { placements: body };
+    if (materials) {
+      payload.floorMaterial = materials.floorMaterial;
+      payload.wallMaterial = materials.wallMaterial;
+      payload.skirtingMaterial = materials.skirtingMaterial;
+    }
+    await apiClient.put<Design>(`/designs/${id}`, payload);
   },
 
   async remove(id: string): Promise<void> {

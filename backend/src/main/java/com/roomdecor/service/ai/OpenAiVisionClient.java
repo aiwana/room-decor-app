@@ -11,16 +11,13 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
 /**
  * OpenAI GPT-4o Vision implementation of RoomVisionClient.
- * Sends the room photo to GPT-4o and asks it to return a structured JSON
- * describing the room walls and dimensions.
- *
- * Used when app.ai.openai.api-key is not blank (see {@link com.roomdecor.config.AiConfig}).
- * Otherwise the mock client is used so the app still runs without an API key.
+ * Sends the room photo as an inline data URL so local uploads do not need a public URL.
  */
 public class OpenAiVisionClient implements RoomVisionClient {
 
@@ -38,39 +35,28 @@ public class OpenAiVisionClient implements RoomVisionClient {
     }
 
     @Override
-    public RoomAnalysisResult analyze(String imageUrl) {
-        String prompt = """
-            You are a room-scanning assistant. Analyze this room photo and return a JSON object
-            describing a top-down 2D floor plan in METERS. The origin is the top-left corner.
-
-            Return ONLY valid JSON with this exact shape:
-            {
-              "roomWidthMeters": <number>,
-              "roomDepthMeters": <number>,
-              "ceilingHeightMeters": <number>,
-              "walls": [ {"x1": <num>, "y1": <num>, "x2": <num>, "y2": <num>} ],
-              "description": "<short description of the room style and detected features>"
-            }
-
-            Rules:
-            - Walls are line segments forming the room boundary (typically 4 for a rectangular room).
-            - x = horizontal (width), y = vertical (depth), in meters from origin.
-            - For a rectangular room: walls connect the 4 corners.
-            - Description: 1-2 sentences in English.
-            """;
+    public RoomAnalysisResult analyze(ImageInput input) {
+        if (input.bytes() == null || input.bytes().length == 0) {
+            throw new BadRequestException("Room image data is empty");
+        }
+        String mimeType = input.mimeType() == null || input.mimeType().isBlank()
+            ? "image/jpeg"
+            : input.mimeType();
+        String dataUrl = "data:" + mimeType + ";base64,"
+            + Base64.getEncoder().encodeToString(input.bytes());
 
         try {
             Map<String, Object> body = Map.of(
                 "model", model,
                 "messages", List.of(
-                    Map.of("role", "system", "content", prompt),
+                    Map.of("role", "system", "content", RoomScanPrompt.TEXT),
                     Map.of("role", "user", "content", List.of(
                         Map.of("type", "text", "text", "Analyze this room and return the floor plan JSON."),
-                        Map.of("type", "image_url", "image_url", Map.of("url", imageUrl))
+                        Map.of("type", "image_url", "image_url", Map.of("url", dataUrl))
                     ))
                 ),
                 "response_format", Map.of("type", "json_object"),
-                "max_tokens", 1000
+                "max_tokens", 1200
             );
 
             HttpRequest req = HttpRequest.newBuilder()
@@ -78,7 +64,7 @@ public class OpenAiVisionClient implements RoomVisionClient {
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
-                .timeout(Duration.ofSeconds(60))
+                .timeout(Duration.ofSeconds(90))
                 .build();
 
             HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
@@ -87,7 +73,14 @@ public class OpenAiVisionClient implements RoomVisionClient {
             }
 
             JsonNode root = mapper.readTree(resp.body());
-            String content = root.path("choices").get(0).path("message").path("content").asText();
+            JsonNode choices = root.path("choices");
+            if (!choices.isArray() || choices.isEmpty()) {
+                throw new BadRequestException("OpenAI returned no choices");
+            }
+            String content = choices.get(0).path("message").path("content").asText();
+            if (content.isBlank()) {
+                throw new BadRequestException("OpenAI returned an empty response");
+            }
             JsonNode parsed = mapper.readTree(content);
 
             List<WallSegment> walls = new ArrayList<>();

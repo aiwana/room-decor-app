@@ -3,8 +3,8 @@
  * Bang chon noi that truot tu duoi len (trong trinh chinh sua): loc theo danh muc,
  * cham 1 mon de dat vao giua anh phong.
  */
-import React, { useState } from 'react';
-import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { BackHandler, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -29,6 +29,17 @@ const FurniturePicker: React.FC<FurniturePickerProps> = ({ visible, onClose, onP
   const [category, setCategory] = useState<string | undefined>();
   const { items, isSample, loading, error, refresh } = useFurniture(category);
 
+  useEffect(() => {
+    if (!visible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible, onClose]);
+
+  if (!visible) return null;
+
   const renderBody = (): React.ReactNode => {
     if (loading) return <LoadingView />;
     if (error) return <ErrorView message={getErrorMessage(error)} onRetry={refresh} />;
@@ -50,8 +61,8 @@ const FurniturePicker: React.FC<FurniturePickerProps> = ({ visible, onClose, onP
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={styles.sheet} edges={['top', 'bottom']}>
+    <View style={styles.overlay}>
+      <SafeAreaView style={styles.sheet} edges={['bottom']}>
         <View style={styles.header}>
           <Text style={styles.title}>Chọn nội thất</Text>
           <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Đóng">
@@ -75,11 +86,17 @@ const FurniturePicker: React.FC<FurniturePickerProps> = ({ visible, onClose, onP
         {isSample && !USE_MOCK ? <Notice message="Máy chủ chưa có nội thất, đang dùng nội thất mẫu." /> : null}
         {renderBody()}
       </SafeAreaView>
-    </Modal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: COLORS.background,
+    zIndex: 25,
+    elevation: 25,
+  },
   sheet: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row',

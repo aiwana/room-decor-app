@@ -87,6 +87,7 @@ const PlacedItem: React.FC<PlacedItemProps> = ({ placement, furniture, frame, si
 
   const commit = (): void => {
     'worklet';
+    runOnJS(onSelect)(id);
     runOnJS(onChange)(id, {
       x: clampWorklet(cx.value / frameW, 0, 1),
       y: clampWorklet(cy.value / frameH, 0, 1),
@@ -105,10 +106,7 @@ const PlacedItem: React.FC<PlacedItemProps> = ({ placement, furniture, frame, si
   });
 
   const pan = Gesture.Pan()
-    .onStart(() => {
-      saveStart();
-      runOnJS(onSelect)(id);
-    })
+    .onStart(saveStart)
     .onUpdate((e) => {
       // Tam mon do khong ra ngoai khung anh
       cx.value = clampWorklet(start.value.cx + e.translationX, 0, frameW);

@@ -16,7 +16,7 @@
  * va mo tren man hinh khac kich thuoc van dung cho.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -29,15 +29,27 @@ import FloorPlanBackground from '@/components/design/FloorPlanBackground';
 import View3D from '@/components/design/View3D';
 import FurniturePicker from '@/components/editor/FurniturePicker';
 import PlacedItem, { MAX_SCALE, MIN_SCALE, type FrameSize } from '@/components/editor/PlacedItem';
+import QuoteSheet from '@/components/editor/QuoteSheet';
+import RoomMaterialPicker from '@/components/editor/RoomMaterialPicker';
+import RoomSizeEditor, { type RoomSizeValues } from '@/components/editor/RoomSizeEditor';
 import { COLORS, RADIUS, SPACING } from '@/constants/colors';
+import {
+  DEFAULT_FLOOR_MATERIAL,
+  DEFAULT_SKIRTING_MATERIAL,
+  DEFAULT_WALL_MATERIAL,
+  FALLBACK_MATERIALS,
+  getMaterialColor,
+} from '@/constants/materials';
 import { useAsync } from '@/hooks/useAsync';
 import { aiApi } from '@/services/ai-api';
 import { getErrorMessage } from '@/services/api-error';
 import { designApi } from '@/services/design-api';
-import { floorPlanApi } from '@/services/floor-plan-api';
+import { floorPlanApi, rectangleWalls } from '@/services/floor-plan-api';
 import { furnitureApi } from '@/services/furniture-api';
+import { materialsApi } from '@/services/materials-api';
 import type { DesignDetail, FloorPlan, Furniture, FurniturePlacement, IoniconName } from '@/types';
-import { clamp, createId, firstParam } from '@/utils';
+import { clamp, createId, firstParam, formatArea, formatPrice, toAssetUrl } from '@/utils';
+import { buildQuote } from '@/utils/quote';
 
 /** Ti le khung anh mac dinh khi chua biet kich thuoc anh */
 const DEFAULT_RATIO = 4 / 3;
@@ -45,6 +57,8 @@ const SCALE_STEP = 1.15;
 const CM_PER_M = 100;
 /** Mon do nho nhat tren mat bang (px) de van bam duoc */
 const MIN_PLAN_ITEM = 14;
+
+const round2 = (value: number): number => Math.round(value * 100) / 100;
 
 type ViewMode = 'photo' | 'plan' | '3d';
 
@@ -104,6 +118,17 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('photo');
   const [floorPlan, setFloorPlan] = useState<FloorPlan | null>(initialFloorPlan);
   const [scanning, setScanning] = useState(false);
+  const [floorMaterial, setFloorMaterial] = useState(design.floorMaterial ?? DEFAULT_FLOOR_MATERIAL);
+  const [wallMaterial, setWallMaterial] = useState(design.wallMaterial ?? DEFAULT_WALL_MATERIAL);
+  const [skirtingMaterial, setSkirtingMaterial] = useState(
+    design.skirtingMaterial ?? DEFAULT_SKIRTING_MATERIAL,
+  );
+  const [sizeEditorOpen, setSizeEditorOpen] = useState(false);
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [materialPickerOpen, setMaterialPickerOpen] = useState(false);
+
+  const materialsState = useAsync(() => materialsApi.list(), []);
+  const materials = materialsState.data?.length ? materialsState.data : FALLBACK_MATERIALS;
 
   const furnitureById = useMemo(() => {
     const map = new Map<string, Furniture>();
@@ -116,6 +141,23 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
     ? { width: containerWidth, height: (containerWidth * floorPlan.roomDepth) / floorPlan.roomWidth }
     : null;
   const selected = placements.find((p) => p.id === selectedId);
+  const floorItem = materials.find((m) => m.code === floorMaterial);
+  const wallItem = materials.find((m) => m.code === wallMaterial);
+  const skirtingItem = materials.find((m) => m.code === skirtingMaterial);
+
+  const quote = useMemo(
+    () =>
+      buildQuote({
+        floorPlan,
+        placements,
+        furnitureById,
+        materials,
+        floorMaterial,
+        wallMaterial,
+        skirtingMaterial,
+      }),
+    [floorPlan, placements, furnitureById, materials, floorMaterial, wallMaterial, skirtingMaterial],
+  );
 
   /** Kich thuoc that (met -> px) cua mon do tren mat bang */
   const planSizeOf = (item: Furniture | undefined, plan: FloorPlan, f: FrameSize): { w: number; h: number } => ({
@@ -234,13 +276,34 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
   const handleSave = async (): Promise<void> => {
     setSaving(true);
     try {
-      await designApi.savePlacements(design.id, placements);
+      await designApi.savePlacements(design.id, placements, {
+        floorMaterial,
+        wallMaterial,
+        skirtingMaterial,
+      });
       setDirty(false);
     } catch (e) {
       Alert.alert('Không lưu được thiết kế', getErrorMessage(e));
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSaveRoomSize = async (values: RoomSizeValues): Promise<void> => {
+    if (!floorPlan) return;
+    const ratioX = floorPlan.roomWidth > 0 ? values.roomWidth / floorPlan.roomWidth : 1;
+    const ratioY = floorPlan.roomDepth > 0 ? values.roomDepth / floorPlan.roomDepth : 1;
+    const walls =
+      floorPlan.walls.length > 0
+        ? floorPlan.walls.map((w) => ({
+            x1: round2(w.x1 * ratioX),
+            y1: round2(w.y1 * ratioY),
+            x2: round2(w.x2 * ratioX),
+            y2: round2(w.y2 * ratioY),
+          }))
+        : rectangleWalls(values.roomWidth, values.roomDepth);
+    const updated = await floorPlanApi.update(floorPlan, { ...values, walls });
+    setFloorPlan(updated);
   };
 
   const onLayout = (e: LayoutChangeEvent): void => setContainerWidth(e.nativeEvent.layout.width);
@@ -261,7 +324,7 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
         }}
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} scrollEnabled={!selectedId && viewMode !== '3d'}>
+      <View style={styles.body}>
         <MockModeNotice />
 
         {/* ===== Chon che do xem ===== */}
@@ -280,30 +343,64 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
           ))}
         </View>
 
+        <Pressable
+          style={styles.materialSummary}
+          onPress={(): void => setMaterialPickerOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Đổi vật liệu phòng"
+        >
+          <View style={styles.materialDots}>
+            {[floorItem, wallItem, skirtingItem].map((item, index) => {
+              const uri = toAssetUrl(item?.textureUrl);
+              return (
+                <View
+                  key={index}
+                  style={[styles.materialDot, { backgroundColor: item?.colorHex ?? COLORS.surfaceAlt }]}
+                >
+                  {uri ? <Image source={{ uri }} style={styles.materialDotImage} contentFit="cover" /> : null}
+                </View>
+              );
+            })}
+          </View>
+          <View style={styles.materialSummaryText}>
+            <Text style={styles.materialSummaryLabel}>Vật liệu phòng</Text>
+            <Text style={styles.materialSummaryValue} numberOfLines={1}>
+              {[floorItem?.name, wallItem?.name, skirtingItem?.name].filter(Boolean).join(' · ') ||
+                'Chọn vật liệu'}
+            </Text>
+          </View>
+          <View style={styles.materialChange}>
+            <Text style={styles.materialChangeText}>Đổi</Text>
+            <Ionicons name="chevron-forward" size={14} color={COLORS.accent} />
+          </View>
+        </Pressable>
+
         {/* ===== Khung anh phong / mat bang / 3D + do ===== */}
         <View style={styles.frameWrap} onLayout={onLayout}>
           {containerWidth > 0 && viewMode === 'photo' ? (
-            <Pressable
-              style={[styles.frame, { height: photoFrame.height }]}
-              onPress={(): void => setSelectedId(null)}
-              accessibilityLabel="Ảnh căn phòng"
-            >
-              {design.roomImageUri ? (
-                <Image
-                  source={{ uri: design.roomImageUri }}
-                  style={StyleSheet.absoluteFill}
-                  contentFit="cover"
-                  onLoad={(e): void => {
-                    const { width, height } = e.source;
-                    if (width > 0 && height > 0) setRatio(clamp(width / height, 0.5, 2));
-                  }}
-                />
-              ) : (
-                <View style={styles.noImage}>
-                  <Ionicons name="image-outline" size={40} color={COLORS.inactive} />
-                  <Text style={styles.noImageText}>Máy này không có ảnh phòng của thiết kế.</Text>
-                </View>
-              )}
+            <View style={[styles.frame, { height: photoFrame.height }]}>
+              <Pressable
+                style={StyleSheet.absoluteFill}
+                onPress={(): void => setSelectedId(null)}
+                accessibilityLabel="Ảnh căn phòng"
+              >
+                {design.roomImageUri ? (
+                  <Image
+                    source={{ uri: design.roomImageUri }}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                    onLoad={(e): void => {
+                      const { width, height } = e.source;
+                      if (width > 0 && height > 0) setRatio(clamp(width / height, 0.5, 2));
+                    }}
+                  />
+                ) : (
+                  <View style={styles.noImage}>
+                    <Ionicons name="image-outline" size={40} color={COLORS.inactive} />
+                    <Text style={styles.noImageText}>Máy này không có ảnh phòng của thiết kế.</Text>
+                  </View>
+                )}
+              </Pressable>
               {placements.map((p) => (
                 <PlacedItem
                   key={p.id}
@@ -315,16 +412,24 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
                   onChange={handleChange}
                 />
               ))}
-            </Pressable>
+            </View>
           ) : null}
 
           {containerWidth > 0 && viewMode === 'plan' && floorPlan && planFrame ? (
-            <Pressable
-              style={[styles.frame, { height: planFrame.height }]}
-              onPress={(): void => setSelectedId(null)}
-              accessibilityLabel="Mặt bằng 2D của phòng"
-            >
-              <FloorPlanBackground floorPlan={floorPlan} width={planFrame.width} height={planFrame.height} />
+            <View style={[styles.frame, { height: planFrame.height }]}>
+              <Pressable
+                style={StyleSheet.absoluteFill}
+                onPress={(): void => setSelectedId(null)}
+                accessibilityLabel="Mặt bằng 2D của phòng"
+              >
+                <FloorPlanBackground
+                  floorPlan={floorPlan}
+                  width={planFrame.width}
+                  height={planFrame.height}
+                  floorColor={getMaterialColor(floorMaterial, 'floor', materials)}
+                  wallColor={getMaterialColor(wallMaterial, 'wall', materials)}
+                />
+              </Pressable>
               {placements.map((p) => {
                 const item = furnitureById.get(p.furnitureId);
                 return (
@@ -340,12 +445,18 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
                   />
                 );
               })}
-            </Pressable>
+            </View>
           ) : null}
 
           {containerWidth > 0 && viewMode === '3d' && floorPlan ? (
-            <View style={[styles.frame, { height: containerWidth }]}>
-              <View3D floorPlan={floorPlan} placements={placements} furnitureById={furnitureById} />
+            <View style={[styles.frame, { height: Math.round(containerWidth * 0.75) }]}>
+              <View3D
+                floorPlan={floorPlan}
+                placements={placements}
+                furnitureById={furnitureById}
+                floorMaterial={floorMaterial}
+                wallMaterial={wallMaterial}
+              />
             </View>
           ) : null}
 
@@ -360,10 +471,24 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
 
         {viewMode !== 'photo' && floorPlan ? (
           <View style={styles.planInfo}>
-            <Text style={styles.planInfoText}>
-              {`Phòng ${floorPlan.roomWidth.toFixed(1)} × ${floorPlan.roomDepth.toFixed(1)} m, trần ${floorPlan.ceilingHeight.toFixed(1)} m`}
-              {floorPlan.description ? `\n${floorPlan.description}` : ''}
-            </Text>
+            <View style={styles.planInfoTextWrap}>
+              <Pressable
+                style={styles.sizeButton}
+                onPress={(): void => setSizeEditorOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Chỉnh kích thước phòng"
+              >
+                <Text style={styles.planInfoDim}>
+                  {`Phòng ${floorPlan.roomWidth.toFixed(1)} × ${floorPlan.roomDepth.toFixed(1)} m · trần ${floorPlan.ceilingHeight.toFixed(1)} m`}
+                </Text>
+                <Ionicons name="create-outline" size={14} color={COLORS.accent} />
+              </Pressable>
+              {floorPlan.description ? (
+                <Text style={styles.planInfoDesc} numberOfLines={2}>
+                  {floorPlan.description}
+                </Text>
+              ) : null}
+            </View>
             <Button title="Quét lại" iconName="scan-outline" variant="ghost" onPress={handleScan} loading={scanning} style={styles.rescan} />
           </View>
         ) : null}
@@ -386,31 +511,47 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
           </View>
         ) : null}
 
-        {/* ===== Thanh dieu khien mon dang chon ===== */}
-        {selected ? (
-          <View style={styles.selectedBar}>
-            <Text style={styles.selectedName} numberOfLines={1}>
-              {furnitureById.get(selected.furnitureId)?.name ?? 'Món đồ'}
+        <Pressable
+          style={styles.quoteBar}
+          onPress={(): void => setQuoteOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Xem báo giá"
+        >
+          <View style={styles.quoteText}>
+            <Text style={styles.quoteLabel}>
+              {placements.length} món{floorPlan ? ` · ${formatArea(quote.floorArea ?? 0)} sàn` : ''}
             </Text>
-            <View style={styles.selectedActions}>
-              <ToolButton icon="refresh" label="Xoay" onPress={(): void => patchSelected((p) => ({ rotation: (p.rotation + 45) % 360 }))} />
-              <ToolButton
-                icon="remove"
-                label="Nhỏ"
-                onPress={(): void => patchSelected((p) => ({ scale: clamp(p.scale / SCALE_STEP, MIN_SCALE, MAX_SCALE) }))}
-              />
-              <ToolButton
-                icon="add"
-                label="To"
-                onPress={(): void => patchSelected((p) => ({ scale: clamp(p.scale * SCALE_STEP, MIN_SCALE, MAX_SCALE) }))}
-              />
-              <ToolButton icon="trash-outline" label="Xoá" danger onPress={removeSelected} />
-            </View>
+            <Text style={styles.quoteValue}>{quote.total > 0 ? formatPrice(quote.total) : 'Chưa có giá'}</Text>
           </View>
-        ) : null}
+          <View style={styles.quoteMore}>
+            <Text style={styles.quoteMoreText}>Báo giá</Text>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.accent} />
+          </View>
+        </Pressable>
+      </View>
 
-        <Text style={styles.count}>{placements.length} món đồ trong thiết kế</Text>
-      </ScrollView>
+      {/* ===== Thanh dieu khien mon dang chon (co dinh, khong bi cat) ===== */}
+      {selected ? (
+        <View style={styles.selectedBar}>
+          <Text style={styles.selectedName} numberOfLines={1}>
+            {furnitureById.get(selected.furnitureId)?.name ?? 'Món đồ'}
+          </Text>
+          <View style={styles.selectedActions}>
+            <ToolButton icon="refresh" label="Xoay" onPress={(): void => patchSelected((p) => ({ rotation: (p.rotation + 45) % 360 }))} />
+            <ToolButton
+              icon="remove"
+              label="Nhỏ"
+              onPress={(): void => patchSelected((p) => ({ scale: clamp(p.scale / SCALE_STEP, MIN_SCALE, MAX_SCALE) }))}
+            />
+            <ToolButton
+              icon="add"
+              label="To"
+              onPress={(): void => patchSelected((p) => ({ scale: clamp(p.scale * SCALE_STEP, MIN_SCALE, MAX_SCALE) }))}
+            />
+            <ToolButton icon="trash-outline" label="Xoá" danger onPress={removeSelected} />
+          </View>
+        </View>
+      ) : null}
 
       {/* ===== Thanh cong cu duoi ===== */}
       <View style={styles.toolbar}>
@@ -433,6 +574,38 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
         />
       </View>
 
+      {floorPlan ? (
+        <RoomSizeEditor
+          visible={sizeEditorOpen}
+          floorPlan={floorPlan}
+          onClose={(): void => setSizeEditorOpen(false)}
+          onSave={handleSaveRoomSize}
+        />
+      ) : null}
+
+      <RoomMaterialPicker
+        visible={materialPickerOpen}
+        onClose={(): void => setMaterialPickerOpen(false)}
+        materials={materials}
+        floorMaterial={floorMaterial}
+        wallMaterial={wallMaterial}
+        skirtingMaterial={skirtingMaterial}
+        onChangeFloor={(id): void => {
+          setFloorMaterial(id);
+          setDirty(true);
+        }}
+        onChangeWall={(id): void => {
+          setWallMaterial(id);
+          setDirty(true);
+        }}
+        onChangeSkirting={(id): void => {
+          setSkirtingMaterial(id);
+          setDirty(true);
+        }}
+      />
+
+      <QuoteSheet visible={quoteOpen} quote={quote} onClose={(): void => setQuoteOpen(false)} />
+
       <FurniturePicker visible={pickerOpen} onClose={(): void => setPickerOpen(false)} onPick={addFurniture} />
     </View>
   );
@@ -454,12 +627,33 @@ const ToolButton: React.FC<ToolButtonProps> = ({ icon, label, onPress, danger })
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
-  scrollContent: { paddingTop: SPACING.sm, paddingBottom: SPACING.lg },
+  body: { flex: 1, overflow: 'hidden', paddingTop: SPACING.sm, paddingBottom: SPACING.lg },
   headerSave: { fontSize: 15, fontWeight: '700', color: COLORS.accent },
   headerSaveDisabled: { color: COLORS.inactive },
   frameWrap: { marginHorizontal: SPACING.md, borderRadius: RADIUS.lg, overflow: 'hidden' },
   frame: { width: '100%', backgroundColor: COLORS.surfaceAlt, overflow: 'hidden' },
   modes: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, paddingHorizontal: SPACING.md, marginBottom: SPACING.sm },
+  materialSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  materialDots: { flexDirection: 'row', gap: 4 },
+  materialDot: { width: 26, height: 26, borderRadius: RADIUS.sm, overflow: 'hidden' },
+  materialDotImage: { width: '100%', height: '100%' },
+  materialSummaryText: { flex: 1, gap: 1 },
+  materialSummaryLabel: { fontSize: 10, color: COLORS.textSecondary, fontWeight: '600' },
+  materialSummaryValue: { fontSize: 12, color: COLORS.textPrimary },
+  materialChange: { flexDirection: 'row', alignItems: 'center', gap: 1 },
+  materialChangeText: { fontSize: 12, color: COLORS.accent, fontWeight: '600' },
   noPlan: {
     alignItems: 'center',
     gap: SPACING.md,
@@ -475,8 +669,11 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.md,
     marginTop: SPACING.sm,
   },
-  planInfoText: { flex: 1, fontSize: 12, color: COLORS.textSecondary, lineHeight: 17 },
-  rescan: { paddingHorizontal: SPACING.sm },
+  planInfoTextWrap: { flex: 1, gap: 2 },
+  sizeButton: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6 },
+  planInfoDim: { fontSize: 12, fontWeight: '600', color: COLORS.textPrimary },
+  planInfoDesc: { fontSize: 11, color: COLORS.textSecondary, lineHeight: 16 },
+  rescan: { height: 36, paddingHorizontal: SPACING.sm },
   noImage: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', padding: SPACING.md },
   noImageText: { marginTop: SPACING.sm, fontSize: 13, color: COLORS.textSecondary, textAlign: 'center' },
   tip: { fontSize: 12, color: COLORS.textSecondary, textAlign: 'center', marginTop: SPACING.sm, paddingHorizontal: SPACING.md },
@@ -506,7 +703,24 @@ const styles = StyleSheet.create({
   toolPressed: { backgroundColor: COLORS.surfaceAlt },
   toolLabel: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
   toolDanger: { color: COLORS.danger },
-  count: { fontSize: 12, color: COLORS.inactive, textAlign: 'center', marginTop: SPACING.md },
+  quoteBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  quoteText: { gap: 1 },
+  quoteLabel: { fontSize: 11, color: COLORS.textSecondary },
+  quoteValue: { fontSize: 16, fontWeight: '700', color: COLORS.accent },
+  quoteMore: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  quoteMoreText: { fontSize: 12, fontWeight: '600', color: COLORS.accent },
   toolbar: {
     flexDirection: 'row',
     gap: SPACING.sm,

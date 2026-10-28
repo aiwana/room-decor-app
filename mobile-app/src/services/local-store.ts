@@ -18,6 +18,9 @@ import type { FurniturePlacement } from '@/types';
 export interface LocalDesignData {
   roomImageUri: string | null;
   placements: FurniturePlacement[];
+  floorMaterial?: string;
+  wallMaterial?: string;
+  skirtingMaterial?: string;
   updatedAt: string;
 }
 
@@ -53,6 +56,9 @@ export const localStore = {
     const next: LocalDesignData = {
       roomImageUri: patch.roomImageUri !== undefined ? patch.roomImageUri : (prev?.roomImageUri ?? null),
       placements: patch.placements ?? prev?.placements ?? [],
+      floorMaterial: patch.floorMaterial !== undefined ? patch.floorMaterial : prev?.floorMaterial,
+      wallMaterial: patch.wallMaterial !== undefined ? patch.wallMaterial : prev?.wallMaterial,
+      skirtingMaterial: patch.skirtingMaterial !== undefined ? patch.skirtingMaterial : prev?.skirtingMaterial,
       updatedAt: new Date().toISOString(),
     };
     map[designId] = next;
