@@ -12,6 +12,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { MOCK_DELAY, STORAGE_KEYS, USE_MOCK } from '@/constants';
+import { DEFAULT_SKIRTING_MATERIAL } from '@/constants/materials';
 import { isSampleFurnitureId } from '@/mock/furniture';
 import type { Design, DesignDetail, FurniturePlacement } from '@/types';
 import { createId, delay } from '@/utils';
@@ -50,6 +51,8 @@ const merge = (design: Design, local: LocalDesignData | undefined): DesignDetail
     roomImageUri: local?.roomImageUri ?? null,
     floorMaterial: local?.floorMaterial ?? design.floorMaterial ?? 'wood',
     wallMaterial: local?.wallMaterial ?? design.wallMaterial ?? 'white',
+    skirtingMaterial:
+      local?.skirtingMaterial ?? design.skirtingMaterial ?? DEFAULT_SKIRTING_MATERIAL,
   };
 };
 
@@ -95,6 +98,7 @@ export const designApi = {
         roomImageId: input.roomImageId,
         floorMaterial: 'wood',
         wallMaterial: 'white',
+        skirtingMaterial: DEFAULT_SKIRTING_MATERIAL,
         placements: [],
         createdAt: now,
         updatedAt: now,
@@ -113,7 +117,7 @@ export const designApi = {
   async savePlacements(
     id: string,
     placements: FurniturePlacement[],
-    materials?: { floorMaterial: string; wallMaterial: string },
+    materials?: { floorMaterial: string; wallMaterial: string; skirtingMaterial: string },
   ): Promise<void> {
     await localStore.update(id, { placements, ...materials });
     if (USE_MOCK) return;
@@ -125,6 +129,7 @@ export const designApi = {
     if (materials) {
       payload.floorMaterial = materials.floorMaterial;
       payload.wallMaterial = materials.wallMaterial;
+      payload.skirtingMaterial = materials.skirtingMaterial;
     }
     await apiClient.put<Design>(`/designs/${id}`, payload);
   },

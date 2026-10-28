@@ -29,14 +29,16 @@ import FloorPlanBackground from '@/components/design/FloorPlanBackground';
 import View3D from '@/components/design/View3D';
 import FurniturePicker from '@/components/editor/FurniturePicker';
 import PlacedItem, { MAX_SCALE, MIN_SCALE, type FrameSize } from '@/components/editor/PlacedItem';
+import QuoteSheet from '@/components/editor/QuoteSheet';
 import RoomMaterialPicker from '@/components/editor/RoomMaterialPicker';
 import RoomSizeEditor, { type RoomSizeValues } from '@/components/editor/RoomSizeEditor';
 import { COLORS, RADIUS, SPACING } from '@/constants/colors';
 import {
   DEFAULT_FLOOR_MATERIAL,
+  DEFAULT_SKIRTING_MATERIAL,
   DEFAULT_WALL_MATERIAL,
-  getFloorColor,
-  getWallColor,
+  FALLBACK_MATERIALS,
+  getMaterialColor,
 } from '@/constants/materials';
 import { useAsync } from '@/hooks/useAsync';
 import { aiApi } from '@/services/ai-api';
@@ -44,8 +46,10 @@ import { getErrorMessage } from '@/services/api-error';
 import { designApi } from '@/services/design-api';
 import { floorPlanApi, rectangleWalls } from '@/services/floor-plan-api';
 import { furnitureApi } from '@/services/furniture-api';
+import { materialsApi } from '@/services/materials-api';
 import type { DesignDetail, FloorPlan, Furniture, FurniturePlacement, IoniconName } from '@/types';
-import { clamp, createId, firstParam } from '@/utils';
+import { clamp, createId, firstParam, formatArea, formatPrice, toAssetUrl } from '@/utils';
+import { buildQuote } from '@/utils/quote';
 
 /** Ti le khung anh mac dinh khi chua biet kich thuoc anh */
 const DEFAULT_RATIO = 4 / 3;
@@ -116,7 +120,15 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
   const [scanning, setScanning] = useState(false);
   const [floorMaterial, setFloorMaterial] = useState(design.floorMaterial ?? DEFAULT_FLOOR_MATERIAL);
   const [wallMaterial, setWallMaterial] = useState(design.wallMaterial ?? DEFAULT_WALL_MATERIAL);
+  const [skirtingMaterial, setSkirtingMaterial] = useState(
+    design.skirtingMaterial ?? DEFAULT_SKIRTING_MATERIAL,
+  );
   const [sizeEditorOpen, setSizeEditorOpen] = useState(false);
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [materialPickerOpen, setMaterialPickerOpen] = useState(false);
+
+  const materialsState = useAsync(() => materialsApi.list(), []);
+  const materials = materialsState.data?.length ? materialsState.data : FALLBACK_MATERIALS;
 
   const furnitureById = useMemo(() => {
     const map = new Map<string, Furniture>();
@@ -129,6 +141,23 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
     ? { width: containerWidth, height: (containerWidth * floorPlan.roomDepth) / floorPlan.roomWidth }
     : null;
   const selected = placements.find((p) => p.id === selectedId);
+  const floorItem = materials.find((m) => m.code === floorMaterial);
+  const wallItem = materials.find((m) => m.code === wallMaterial);
+  const skirtingItem = materials.find((m) => m.code === skirtingMaterial);
+
+  const quote = useMemo(
+    () =>
+      buildQuote({
+        floorPlan,
+        placements,
+        furnitureById,
+        materials,
+        floorMaterial,
+        wallMaterial,
+        skirtingMaterial,
+      }),
+    [floorPlan, placements, furnitureById, materials, floorMaterial, wallMaterial, skirtingMaterial],
+  );
 
   /** Kich thuoc that (met -> px) cua mon do tren mat bang */
   const planSizeOf = (item: Furniture | undefined, plan: FloorPlan, f: FrameSize): { w: number; h: number } => ({
@@ -247,7 +276,11 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
   const handleSave = async (): Promise<void> => {
     setSaving(true);
     try {
-      await designApi.savePlacements(design.id, placements, { floorMaterial, wallMaterial });
+      await designApi.savePlacements(design.id, placements, {
+        floorMaterial,
+        wallMaterial,
+        skirtingMaterial,
+      });
       setDirty(false);
     } catch (e) {
       Alert.alert('Không lưu được thiết kế', getErrorMessage(e));
@@ -310,20 +343,37 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
           ))}
         </View>
 
-        <View style={styles.materialPicker}>
-          <RoomMaterialPicker
-            floorMaterial={floorMaterial}
-            wallMaterial={wallMaterial}
-            onChangeFloor={(id): void => {
-              setFloorMaterial(id);
-              setDirty(true);
-            }}
-            onChangeWall={(id): void => {
-              setWallMaterial(id);
-              setDirty(true);
-            }}
-          />
-        </View>
+        <Pressable
+          style={styles.materialSummary}
+          onPress={(): void => setMaterialPickerOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Đổi vật liệu phòng"
+        >
+          <View style={styles.materialDots}>
+            {[floorItem, wallItem, skirtingItem].map((item, index) => {
+              const uri = toAssetUrl(item?.textureUrl);
+              return (
+                <View
+                  key={index}
+                  style={[styles.materialDot, { backgroundColor: item?.colorHex ?? COLORS.surfaceAlt }]}
+                >
+                  {uri ? <Image source={{ uri }} style={styles.materialDotImage} contentFit="cover" /> : null}
+                </View>
+              );
+            })}
+          </View>
+          <View style={styles.materialSummaryText}>
+            <Text style={styles.materialSummaryLabel}>Vật liệu phòng</Text>
+            <Text style={styles.materialSummaryValue} numberOfLines={1}>
+              {[floorItem?.name, wallItem?.name, skirtingItem?.name].filter(Boolean).join(' · ') ||
+                'Chọn vật liệu'}
+            </Text>
+          </View>
+          <View style={styles.materialChange}>
+            <Text style={styles.materialChangeText}>Đổi</Text>
+            <Ionicons name="chevron-forward" size={14} color={COLORS.accent} />
+          </View>
+        </Pressable>
 
         {/* ===== Khung anh phong / mat bang / 3D + do ===== */}
         <View style={styles.frameWrap} onLayout={onLayout}>
@@ -376,8 +426,8 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
                   floorPlan={floorPlan}
                   width={planFrame.width}
                   height={planFrame.height}
-                  floorColor={getFloorColor(floorMaterial)}
-                  wallColor={getWallColor(wallMaterial)}
+                  floorColor={getMaterialColor(floorMaterial, 'floor', materials)}
+                  wallColor={getMaterialColor(wallMaterial, 'wall', materials)}
                 />
               </Pressable>
               {placements.map((p) => {
@@ -461,7 +511,23 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
           </View>
         ) : null}
 
-        <Text style={styles.count}>{placements.length} món đồ trong thiết kế</Text>
+        <Pressable
+          style={styles.quoteBar}
+          onPress={(): void => setQuoteOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Xem báo giá"
+        >
+          <View style={styles.quoteText}>
+            <Text style={styles.quoteLabel}>
+              {placements.length} món{floorPlan ? ` · ${formatArea(quote.floorArea ?? 0)} sàn` : ''}
+            </Text>
+            <Text style={styles.quoteValue}>{quote.total > 0 ? formatPrice(quote.total) : 'Chưa có giá'}</Text>
+          </View>
+          <View style={styles.quoteMore}>
+            <Text style={styles.quoteMoreText}>Báo giá</Text>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.accent} />
+          </View>
+        </Pressable>
       </View>
 
       {/* ===== Thanh dieu khien mon dang chon (co dinh, khong bi cat) ===== */}
@@ -517,6 +583,29 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
         />
       ) : null}
 
+      <RoomMaterialPicker
+        visible={materialPickerOpen}
+        onClose={(): void => setMaterialPickerOpen(false)}
+        materials={materials}
+        floorMaterial={floorMaterial}
+        wallMaterial={wallMaterial}
+        skirtingMaterial={skirtingMaterial}
+        onChangeFloor={(id): void => {
+          setFloorMaterial(id);
+          setDirty(true);
+        }}
+        onChangeWall={(id): void => {
+          setWallMaterial(id);
+          setDirty(true);
+        }}
+        onChangeSkirting={(id): void => {
+          setSkirtingMaterial(id);
+          setDirty(true);
+        }}
+      />
+
+      <QuoteSheet visible={quoteOpen} quote={quote} onClose={(): void => setQuoteOpen(false)} />
+
       <FurniturePicker visible={pickerOpen} onClose={(): void => setPickerOpen(false)} onPick={addFurniture} />
     </View>
   );
@@ -544,7 +633,27 @@ const styles = StyleSheet.create({
   frameWrap: { marginHorizontal: SPACING.md, borderRadius: RADIUS.lg, overflow: 'hidden' },
   frame: { width: '100%', backgroundColor: COLORS.surfaceAlt, overflow: 'hidden' },
   modes: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, paddingHorizontal: SPACING.md, marginBottom: SPACING.sm },
-  materialPicker: { marginHorizontal: SPACING.md, marginBottom: SPACING.sm },
+  materialSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  materialDots: { flexDirection: 'row', gap: 4 },
+  materialDot: { width: 26, height: 26, borderRadius: RADIUS.sm, overflow: 'hidden' },
+  materialDotImage: { width: '100%', height: '100%' },
+  materialSummaryText: { flex: 1, gap: 1 },
+  materialSummaryLabel: { fontSize: 10, color: COLORS.textSecondary, fontWeight: '600' },
+  materialSummaryValue: { fontSize: 12, color: COLORS.textPrimary },
+  materialChange: { flexDirection: 'row', alignItems: 'center', gap: 1 },
+  materialChangeText: { fontSize: 12, color: COLORS.accent, fontWeight: '600' },
   noPlan: {
     alignItems: 'center',
     gap: SPACING.md,
@@ -594,7 +703,24 @@ const styles = StyleSheet.create({
   toolPressed: { backgroundColor: COLORS.surfaceAlt },
   toolLabel: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
   toolDanger: { color: COLORS.danger },
-  count: { fontSize: 12, color: COLORS.inactive, textAlign: 'center', marginTop: SPACING.md },
+  quoteBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  quoteText: { gap: 1 },
+  quoteLabel: { fontSize: 11, color: COLORS.textSecondary },
+  quoteValue: { fontSize: 16, fontWeight: '700', color: COLORS.accent },
+  quoteMore: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  quoteMoreText: { fontSize: 12, fontWeight: '600', color: COLORS.accent },
   toolbar: {
     flexDirection: 'row',
     gap: SPACING.sm,

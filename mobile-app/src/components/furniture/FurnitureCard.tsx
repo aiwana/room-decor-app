@@ -9,6 +9,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { COLORS, RADIUS } from '@/constants/colors';
 import { formatDimensions, getCategoryLabel } from '@/constants/furniture';
 import type { Furniture } from '@/types';
+import { formatPrice } from '@/utils';
 
 import FurnitureThumb from './FurnitureThumb';
 
@@ -36,6 +37,14 @@ const FurnitureCard: React.FC<FurnitureCardProps> = ({ furniture, variant = 'gri
       <Text style={styles.size} numberOfLines={1}>
         {formatDimensions(furniture)}
       </Text>
+      <Text style={styles.price} numberOfLines={1}>
+        {formatPrice(furniture.price, furniture.currency ?? 'VND')}
+      </Text>
+      {furniture.vendorName ? (
+        <Text style={styles.vendor} numberOfLines={1}>
+          {furniture.vendorName}
+        </Text>
+      ) : null}
     </View>
   </Pressable>
 );
@@ -49,7 +58,9 @@ const styles = StyleSheet.create({
   info: { padding: 8 },
   category: { fontSize: 10, color: COLORS.textSecondary, textTransform: 'uppercase', fontWeight: '600' },
   title: { fontSize: 13, fontWeight: '600', color: COLORS.textPrimary, marginTop: 2, minHeight: 34 },
-  size: { fontSize: 12, fontWeight: '700', color: COLORS.accent, marginTop: 4 },
+  size: { fontSize: 11, color: COLORS.textSecondary, marginTop: 3 },
+  price: { fontSize: 13, fontWeight: '700', color: COLORS.accent, marginTop: 4 },
+  vendor: { fontSize: 9, color: COLORS.inactive, marginTop: 1 },
 });
 
 export default FurnitureCard;

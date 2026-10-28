@@ -20,6 +20,7 @@ export interface LocalDesignData {
   placements: FurniturePlacement[];
   floorMaterial?: string;
   wallMaterial?: string;
+  skirtingMaterial?: string;
   updatedAt: string;
 }
 
@@ -57,6 +58,7 @@ export const localStore = {
       placements: patch.placements ?? prev?.placements ?? [],
       floorMaterial: patch.floorMaterial !== undefined ? patch.floorMaterial : prev?.floorMaterial,
       wallMaterial: patch.wallMaterial !== undefined ? patch.wallMaterial : prev?.wallMaterial,
+      skirtingMaterial: patch.skirtingMaterial !== undefined ? patch.skirtingMaterial : prev?.skirtingMaterial,
       updatedAt: new Date().toISOString(),
     };
     map[designId] = next;

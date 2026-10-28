@@ -40,6 +40,10 @@ public class Design {
     @Builder.Default
     private String wallMaterial = "white";
 
+    @Column(name = "skirting_material", nullable = false, length = 50)
+    @Builder.Default
+    private String skirtingMaterial = "skirting-10x60";
+
     @OneToMany(
         mappedBy = "design",
         cascade = CascadeType.ALL,

@@ -4,8 +4,8 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
+  BackHandler,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -86,6 +86,15 @@ const RoomSizeEditor: React.FC<RoomSizeEditorProps> = ({ visible, floorPlan, onC
     setError(null);
   }, [visible, floorPlan.roomWidth, floorPlan.roomDepth, floorPlan.ceilingHeight]);
 
+  useEffect(() => {
+    if (!visible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible, onClose]);
+
   const handleSave = async (): Promise<void> => {
     const nextWidth = parseValue(width);
     const nextDepth = parseValue(depth);
@@ -121,13 +130,14 @@ const RoomSizeEditor: React.FC<RoomSizeEditorProps> = ({ visible, floorPlan, onC
     }
   };
 
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={styles.card}>
+    <KeyboardAvoidingView
+      style={styles.backdrop}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View style={styles.card}>
           <View style={styles.header}>
             <Text style={styles.title}>Kích thước phòng</Text>
             <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Đóng">
@@ -151,18 +161,19 @@ const RoomSizeEditor: React.FC<RoomSizeEditorProps> = ({ visible, floorPlan, onC
             <Button title="Huỷ" variant="secondary" onPress={onClose} style={styles.action} />
             <Button title="Lưu kích thước" onPress={(): void => void handleSave()} loading={saving} style={styles.action} />
           </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      </View>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   backdrop: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     padding: SPACING.lg,
     backgroundColor: COLORS.overlay,
+    zIndex: 35,
+    elevation: 35,
   },
   card: {
     backgroundColor: COLORS.surface,

@@ -1,5 +1,6 @@
 package com.roomdecor.dto.furniture;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 public record FurnitureDto(
@@ -10,5 +11,12 @@ public record FurnitureDto(
     Double height,
     Double depth,
     String modelUrl,
-    String thumbnailUrl
+    String thumbnailUrl,
+    UUID vendorId,
+    String vendorName,
+    BigDecimal price,
+    String currency,
+    String style,
+    String material,
+    String stockStatus
 ) {}

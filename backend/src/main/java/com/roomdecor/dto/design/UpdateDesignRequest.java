@@ -11,5 +11,6 @@ public record UpdateDesignRequest(
     String name,
     @Size(max = 50) String floorMaterial,
     @Size(max = 50) String wallMaterial,
+    @Size(max = 50) String skirtingMaterial,
     List<PlacementDto> placements
 ) {}

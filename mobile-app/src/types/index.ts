@@ -40,7 +40,7 @@ export interface RegisterInput {
   password: string;
 }
 
-/** FurnitureDto. Kich thuoc tinh bang cm. */
+/** FurnitureDto. Kich thuoc tinh bang cm, gia tinh bang VND. */
 export interface Furniture {
   id: string;
   name: string;
@@ -50,6 +50,36 @@ export interface Furniture {
   depth: number;
   modelUrl?: string | null;
   thumbnailUrl?: string | null;
+  vendorId?: string | null;
+  vendorName?: string | null;
+  price?: number | null;
+  currency?: string | null;
+  style?: string | null;
+  material?: string | null;
+  stockStatus?: string | null;
+}
+
+export type MaterialKind = 'floor' | 'wall' | 'skirting';
+
+/** MaterialDto: vat lieu san/tuong/len chan tuong, gia tham khao. */
+export interface Material {
+  id: string;
+  vendorId?: string | null;
+  vendorName?: string | null;
+  code: string;
+  name: string;
+  kind: MaterialKind;
+  style?: string | null;
+  colorHex?: string | null;
+  tileWidthCm?: number | null;
+  tileHeightCm?: number | null;
+  price?: number | null;
+  priceUnit?: 'm2' | 'md' | 'piece' | string;
+  coverageM2PerBox?: number | null;
+  textureUrl?: string | null;
+  textureLicense?: string | null;
+  sourceUrl?: string | null;
+  isSample?: boolean;
 }
 
 /**
@@ -74,9 +104,10 @@ export interface Design {
   id: string;
   name: string;
   roomImageId: string | null;
-  /** Ma vat lieu san/tuong, xem src/constants/materials.ts */
+  /** Ma vat lieu san/tuong/len chan tuong, xem src/constants/materials.ts */
   floorMaterial?: string | null;
   wallMaterial?: string | null;
+  skirtingMaterial?: string | null;
   placements: FurniturePlacement[];
   /** Co the null ngay sau khi tao (backend chua dien) */
   createdAt: string | null;

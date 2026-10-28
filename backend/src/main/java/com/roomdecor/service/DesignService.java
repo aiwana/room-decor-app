@@ -80,6 +80,9 @@ public class DesignService {
         if (request.wallMaterial() != null && !request.wallMaterial().isBlank()) {
             design.setWallMaterial(request.wallMaterial());
         }
+        if (request.skirtingMaterial() != null && !request.skirtingMaterial().isBlank()) {
+            design.setSkirtingMaterial(request.skirtingMaterial());
+        }
 
         if (request.placements() != null) {
             // Clear existing placements and add the new set
