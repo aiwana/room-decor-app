@@ -14,6 +14,7 @@ RoomDecor là app di động giúp người dùng chụp ảnh căn phòng, đ�
 2. [02-database.md](02-database.md): bật PostgreSQL bằng Docker Compose, Flyway, xem dữ liệu, xoá làm lại.
 3. [03-chay-backend.md](03-chay-backend.md): tạo `backend/.env`, chạy backend, Swagger, chạy test, AI quét phòng.
 4. [04-chay-mobile.md](04-chay-mobile.md): chạy app trên máy ảo Android hoặc điện thoại, chế độ mock và chế độ thật.
+5. [05-tinh-nang-quet-phong-ai-3d.md](05-tinh-nang-quet-phong-ai-3d.md): cập nhật mới (quét nhiều ảnh, sửa hình phòng, AI gợi ý bố trí, 3D): cần làm gì sau khi pull, chạy trên điện thoại thật, lỗi hay gặp.
 
 Tài liệu API:
 
@@ -55,5 +56,5 @@ Máy ảo Android gọi máy tính qua `10.0.2.2`, nên app dùng `http://10.0.2
 ## Những điều không được làm
 
 - **Không commit file `.env`** (`backend/.env`, `mobile-app/.env`): chứa mật khẩu và khóa bí mật. Chỉ commit `.env.example`.
-- **Không sửa migration Flyway đã có** (`V1__...`, `V2__...`, `V3__...`). Muốn đổi bảng thì thêm file mới `V4__...`. Xem [02-database.md](02-database.md).
+- **Không sửa migration Flyway đã có** (`V1__...` đến `V8__...`). Muốn đổi bảng thì thêm file mới `V9__...`. Xem [02-database.md](02-database.md).
 - **Không đặt khóa bí mật vào biến `EXPO_PUBLIC_*`** của app: mọi biến này đều bị đóng gói vào app.

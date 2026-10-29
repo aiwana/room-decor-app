@@ -22,6 +22,12 @@ const PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
   quality: 0.8,
 };
 
+/**
+ * Anh goc phong chup them: nen manh hon de 6 anh gui cho AI van duoi gioi han 14 MB
+ * cua backend (AI chi can nhin hinh dang phong, khong can anh net cang).
+ */
+export const CORNER_PHOTO_QUALITY = 0.5;
+
 const showPermissionAlert = (what: string): void => {
   Alert.alert('Cần quyền truy cập', `RoomDecor cần quyền ${what} để lấy ảnh phòng. Bạn có thể bật trong Cài đặt.`, [
     { text: 'Để sau', style: 'cancel' },
@@ -58,7 +64,9 @@ const persistPicked = async (picked: PickedImage): Promise<PickedImage> => {
   }
 };
 
-export const useRoomImagePicker = (): {
+export const useRoomImagePicker = (
+  quality: number = PICKER_OPTIONS.quality ?? 0.8,
+): {
   pickFromCamera: () => Promise<PickedImage | null>;
   pickFromGallery: () => Promise<PickedImage | null>;
 } => {
@@ -68,9 +76,9 @@ export const useRoomImagePicker = (): {
       showPermissionAlert('camera');
       return null;
     }
-    const picked = toPicked(await ImagePicker.launchCameraAsync(PICKER_OPTIONS));
+    const picked = toPicked(await ImagePicker.launchCameraAsync({ ...PICKER_OPTIONS, quality }));
     return picked ? persistPicked(picked) : null;
-  }, []);
+  }, [quality]);
 
   const pickFromGallery = useCallback(async (): Promise<PickedImage | null> => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -78,9 +86,9 @@ export const useRoomImagePicker = (): {
       showPermissionAlert('thư viện ảnh');
       return null;
     }
-    const picked = toPicked(await ImagePicker.launchImageLibraryAsync(PICKER_OPTIONS));
+    const picked = toPicked(await ImagePicker.launchImageLibraryAsync({ ...PICKER_OPTIONS, quality }));
     return picked ? persistPicked(picked) : null;
-  }, []);
+  }, [quality]);
 
   return { pickFromCamera, pickFromGallery };
 };

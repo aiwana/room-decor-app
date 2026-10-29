@@ -27,8 +27,10 @@ public class AiController {
     }
 
     @PostMapping("/suggest-layout")
-    public ResponseEntity<AiSuggestionResponse> suggestLayout(@Valid @RequestBody AiSuggestionRequest request) {
-        return ResponseEntity.ok(aiService.suggestLayout(request));
+    public ResponseEntity<AiSuggestionResponse> suggestLayout(@Valid @RequestBody AiSuggestionRequest request,
+                                                              Authentication auth) {
+        UUID userId = (UUID) auth.getPrincipal();
+        return ResponseEntity.ok(aiService.suggestLayout(request, userId));
     }
 
     @PostMapping("/describe-room/{roomImageId}")

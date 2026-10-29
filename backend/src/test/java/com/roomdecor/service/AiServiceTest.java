@@ -1,13 +1,20 @@
 package com.roomdecor.service;
 
+import com.roomdecor.dto.ai.AiSuggestionRequest;
+import com.roomdecor.dto.ai.AiSuggestionResponse;
+import com.roomdecor.dto.ai.LayoutItemDto;
 import com.roomdecor.dto.ai.ScanRoomRequest;
 import com.roomdecor.dto.ai.ScanRoomResponse;
 import com.roomdecor.entity.FloorPlan;
+import com.roomdecor.entity.Furniture;
+import com.roomdecor.entity.Opening;
 import com.roomdecor.entity.RoomImage;
 import com.roomdecor.entity.User;
 import com.roomdecor.exception.BadRequestException;
 import com.roomdecor.repository.FloorPlanRepository;
+import com.roomdecor.repository.FurnitureRepository;
 import com.roomdecor.repository.RoomImageRepository;
+import com.roomdecor.service.ai.LayoutAdvisor;
 import com.roomdecor.service.ai.MockVisionClient;
 import com.roomdecor.service.ai.RoomVisionClient;
 import com.roomdecor.storage.StorageService;
@@ -17,7 +24,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,8 +50,10 @@ class AiServiceTest {
     @Mock private FloorPlanRepository floorPlanRepository;
     @Mock private FloorPlanService floorPlanService;
     @Mock private StorageService storageService;
+    @Mock private FurnitureRepository furnitureRepository;
 
     private RoomVisionClient visionClient;
+    private LayoutAdvisor layoutAdvisor;
     private AiService aiService;
 
     private final User owner = user();
@@ -50,7 +62,8 @@ class AiServiceTest {
     @BeforeEach
     void setUp() {
         visionClient = spy(new MockVisionClient());
-        aiService = new AiService(roomImageRepository, floorPlanRepository, floorPlanService, visionClient, storageService);
+        layoutAdvisor = new RuleBasedLayoutAdvisor();
+        aiService = newService(layoutAdvisor);
     }
 
     @Test
@@ -125,6 +138,106 @@ class AiServiceTest {
         aiService.scanRoom(new ScanRoomRequest(main.getId(), null, null), owner.getId());
 
         verify(floorPlanService).createFromScan(eq(main), eq(List.of()), any(), anyInt());
+    }
+
+    /* ------------------------------ Layout suggestion ------------------------------ */
+
+    @Test
+    void suggestRejectsRoomOfAnotherUser() {
+        RoomImage foreign = image(stranger);
+        when(roomImageRepository.findById(foreign.getId())).thenReturn(Optional.of(foreign));
+
+        AiSuggestionRequest request = new AiSuggestionRequest(foreign.getId(), "rearrange", null, null, List.of(sofa(0.5, 0.5)));
+
+        assertThatThrownBy(() -> aiService.suggestLayout(request, owner.getId()))
+            .isInstanceOf(BadRequestException.class)
+            .hasMessage("Access denied to this room image");
+    }
+
+    @Test
+    void suggestNeedsAScannedRoom() {
+        RoomImage main = image(owner);
+        when(roomImageRepository.findById(main.getId())).thenReturn(Optional.of(main));
+        when(floorPlanRepository.findByRoomImageId(main.getId())).thenReturn(Optional.empty());
+
+        AiSuggestionRequest request = new AiSuggestionRequest(main.getId(), null, null, null, List.of(sofa(0.5, 0.5)));
+
+        assertThatThrownBy(() -> aiService.suggestLayout(request, owner.getId()))
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining("Scan the room first");
+    }
+
+    @Test
+    void rearrangeKeepsEveryPieceWithItsIdsInsideTheRoom() {
+        RoomImage main = image(owner);
+        stubPlan(main);
+
+        AiSuggestionResponse response = aiService.suggestLayout(
+            new AiSuggestionRequest(main.getId(), "rearrange", null, null, List.of(sofa(0.5, 0.5), table(0.5, 0.5))),
+            owner.getId());
+
+        assertThat(response.source()).isEqualTo("rules");
+        assertThat(response.placements()).extracting(p -> p.id()).containsExactlyInAnyOrder("pl-sofa", "pl-table");
+        assertThat(response.placements()).allSatisfy(p -> {
+            assertThat(p.x()).isBetween(0.0, 1.0);
+            assertThat(p.y()).isBetween(0.0, 1.0);
+        });
+        assertThat(response.newFurniture()).isEmpty();
+    }
+
+    @Test
+    void whenAiFailsRulesAreUsedInstead() {
+        LayoutAdvisor broken = org.mockito.Mockito.mock(LayoutAdvisor.class);
+        when(broken.usesAi()).thenReturn(true);
+        when(broken.suggest(any())).thenThrow(new BadRequestException("AI service is busy right now"));
+        aiService = newService(broken);
+        RoomImage main = image(owner);
+        stubPlan(main);
+
+        AiSuggestionResponse response = aiService.suggestLayout(
+            new AiSuggestionRequest(main.getId(), "rearrange", null, null, List.of(sofa(0.5, 0.5))), owner.getId());
+
+        assertThat(response.source()).isEqualTo("rules");
+        assertThat(response.placements()).hasSize(1);
+    }
+
+    @Test
+    void addKeepsCurrentPiecesAndReturnsTheNewFurniture() {
+        RoomImage main = image(owner);
+        stubPlan(main);
+        Furniture lamp = Furniture.builder().id(UUID.randomUUID()).name("Đèn cây").category("lighting")
+            .width(40.0).depth(40.0).height(160.0).price(BigDecimal.valueOf(1_450_000)).build();
+        when(furnitureRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(lamp)));
+
+        AiSuggestionResponse response = aiService.suggestLayout(
+            new AiSuggestionRequest(main.getId(), "add", null, null, List.of(sofa(0.3, 0.2))), owner.getId());
+
+        assertThat(response.placements()).hasSize(2);
+        assertThat(response.placements().get(0).id()).isEqualTo("pl-sofa");
+        assertThat(response.placements().get(0).x()).isEqualTo(0.3);
+        assertThat(response.placements().get(1).furnitureId()).isEqualTo(lamp.getId().toString());
+        assertThat(response.newFurniture()).extracting(f -> f.id()).containsExactly(lamp.getId());
+    }
+
+    private AiService newService(LayoutAdvisor advisor) {
+        return new AiService(roomImageRepository, floorPlanRepository, floorPlanService, visionClient, storageService,
+            furnitureRepository, advisor);
+    }
+
+    /** 4m x 4m room with a door in the middle of the bottom wall */
+    private void stubPlan(RoomImage image) {
+        when(roomImageRepository.findById(image.getId())).thenReturn(Optional.of(image));
+        FloorPlan plan = floorPlan(image);
+        plan.setOpenings(List.of(new Opening(Opening.DOOR, 1.6, 4, 2.4, 4)));
+        when(floorPlanRepository.findByRoomImageId(image.getId())).thenReturn(Optional.of(plan));
+    }
+
+    private static LayoutItemDto sofa(double x, double y) {
+        return new LayoutItemDto("pl-sofa", "sample-sofa-3", "Sofa", "sofa", 210.0, 90.0, 85.0, x, y, 0.0, 1.0);
+    }
+
+    private static LayoutItemDto table(double x, double y) {
+        return new LayoutItemDto("pl-table", "sample-coffee-table", "Bàn trà", "table", 110.0, 60.0, 45.0, x, y, 0.0, 1.0);
     }
 
     private void stubImages(RoomImage... images) {

@@ -28,7 +28,7 @@ public class MockVisionClient implements RoomVisionClient {
             ),
             List.of(new Opening(Opening.DOOR, 0.5, d, 1.35, d)),
             String.format(Locale.ROOT,
-                "Mock scan: rectangular room %.1fm x 4.0m with one door, from %d photo(s) (no API key configured)",
+                "Phòng mẫu hình chữ nhật %.1f m x 4.0 m, có 1 cửa ra vào, quét từ %d ảnh (chưa cấu hình khoá AI).",
                 w, images.size())
         );
     }

@@ -1,12 +1,13 @@
 /**
  * src/components/design/View3D.tsx
- * Xem phong 3D trong WebView bang Three.js: tuong dung len tu mat bang, noi that la cac khoi hop
- * dat dung vi tri / goc xoay / ti le nhu trong trinh chinh sua. Keo 1 ngon de xoay camera, chum de zoom.
+ * Xem phong 3D trong WebView bang Three.js. Phan dung canh (noi that theo loai, tuong tu cat khi chan camera,
+ * cua, anh sang, bong do) nam trong view3d-scene.ts; file nay chi gom du lieu va tao trang HTML.
  *
- * Dua tren View3D cua nhanh test-tinh-nang, sua:
  *  - three@0.169 khong con build/three.min.js va examples/js -> dung ES module + importmap
- *  - don vi 1 = 1 met; kich thuoc noi that (cm) doi sang met
- *  - toa do placement la ti le 0..1 -> nhan voi kich thuoc phong
+ *  - don vi 1 = 1 met; kich thuoc noi that (cm) doi sang met; toa do placement 0..1 -> nhan voi kich thuoc phong
+ *  - san ve theo da giac cac goc (phong chu L...), tuong khoet lo cua ra vao / cua so
+ *  - van san / tuong lay tu anh vat lieu cua may chu (textureUrl); trang dat baseUrl = dia chi may chu
+ *    de WebGL doc anh cung nguon (khong vuong CORS)
  * Can Internet de tai Three.js tu CDN (lan dau).
  */
 import React, { useMemo } from 'react';
@@ -14,11 +15,18 @@ import { StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import { COLORS } from '@/constants/colors';
-import { getFloorColor, getWallColor } from '@/constants/materials';
-import type { FloorPlan, Furniture, FurniturePlacement } from '@/types';
+import { getMaterialColor } from '@/constants/materials';
+import type { FloorPlan, Furniture, FurniturePlacement, Material } from '@/types';
+import { toAssetUrl } from '@/utils';
+import { floorPlanPolygon } from '@/utils/room-geometry';
+
+import { SCENE_SCRIPT } from './view3d-scene';
 
 const THREE_VERSION = '0.169.0';
 const CM_PER_M = 100;
+/** Mot anh van vat lieu phu bao nhieu met (anh Poly Haven ~2m; granite_tile_03 la 2x2 vien 60cm) */
+const TEXTURE_METERS: Record<string, number> = { 'granite_tile_03.jpg': 1.2 };
+const DEFAULT_TEXTURE_METERS = 2;
 
 interface View3DProps {
   floorPlan: FloorPlan;
@@ -26,46 +34,65 @@ interface View3DProps {
   furnitureById: Map<string, Furniture>;
   floorMaterial?: string;
   wallMaterial?: string;
+  skirtingMaterial?: string;
+  /** Danh sach vat lieu (de lay mau + anh van) */
+  materials?: Material[];
 }
 
-interface SceneBox {
-  x: number;
-  z: number;
-  w: number;
-  d: number;
-  h: number;
-  rotation: number;
+interface TextureSpec {
+  url: string;
+  meters: number;
 }
 
-const buildScene = (
-  floorPlan: FloorPlan,
-  placements: FurniturePlacement[],
-  furnitureById: Map<string, Furniture>,
-  floorMaterial?: string,
-  wallMaterial?: string,
-) => ({
+const textureOf = (code: string | undefined, materials?: Material[]): TextureSpec | null => {
+  const url = toAssetUrl(materials?.find((m) => m.code === code)?.textureUrl);
+  if (!url) return null;
+  const file = url.split('/').pop() ?? '';
+  return { url, meters: TEXTURE_METERS[file] ?? DEFAULT_TEXTURE_METERS };
+};
+
+const buildScene = ({
+  floorPlan,
+  placements,
+  furnitureById,
+  floorMaterial,
+  wallMaterial,
+  skirtingMaterial,
+  materials,
+}: View3DProps) => ({
+  background: COLORS.background,
   room: { width: floorPlan.roomWidth, depth: floorPlan.roomDepth, height: floorPlan.ceilingHeight },
-  walls: floorPlan.walls,
-  floorColor: getFloorColor(floorMaterial),
-  wallColor: getWallColor(wallMaterial),
-  boxes: placements.flatMap((p): SceneBox[] => {
+  floor: floorPlanPolygon(floorPlan),
+  openings: floorPlan.openings ?? [],
+  floorColor: getMaterialColor(floorMaterial, 'floor', materials),
+  wallColor: getMaterialColor(wallMaterial, 'wall', materials),
+  skirtingColor: getMaterialColor(skirtingMaterial, 'skirting', materials),
+  floorTexture: textureOf(floorMaterial, materials),
+  // Son tuong khong co anh van -> chi dung mau
+  wallTexture: textureOf(wallMaterial, materials),
+  items: placements.flatMap((p) => {
     const f = furnitureById.get(p.furnitureId);
     if (!f) return [];
     return [
       {
         x: p.x * floorPlan.roomWidth,
         z: p.y * floorPlan.roomDepth,
-        w: (f.width / CM_PER_M) * p.scale,
-        d: (f.depth / CM_PER_M) * p.scale,
-        h: (f.height / CM_PER_M) * p.scale,
+        w: Math.max((f.width / CM_PER_M) * p.scale, 0.02),
+        d: Math.max((f.depth / CM_PER_M) * p.scale, 0.02),
+        h: Math.max((f.height / CM_PER_M) * p.scale, 0.01),
         rotation: p.rotation,
+        category: f.category,
+        name: f.name,
+        material: f.material ?? null,
+        modelUrl: toAssetUrl(f.modelUrl) ?? null,
       },
     ];
   }),
 });
 
-const buildHtml = (scene: ReturnType<typeof buildScene>): string => `<!DOCTYPE html>
+export const buildView3DHtml = (scene: ReturnType<typeof buildScene>): string => `<!DOCTYPE html>
 <html><head>
+<meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
 <style>html,body{margin:0;height:100%;overflow:hidden;background:${COLORS.background};color:#b0b0b0;font-family:sans-serif}
 #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:14px}</style>
@@ -74,100 +101,26 @@ const buildHtml = (scene: ReturnType<typeof buildScene>): string => `<!DOCTYPE h
   "three/addons/":"https://cdn.jsdelivr.net/npm/three@${THREE_VERSION}/examples/jsm/"}}</script>
 </head><body>
 <div id="msg">Đang tải 3D...</div>
-<script>setTimeout(function(){var m=document.getElementById('msg');if(m)m.textContent='Không tải được 3D. Kiểm tra kết nối Internet rồi mở lại.';},15000);</script>
-<script type="module">
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-const data = ${JSON.stringify(scene)};
-const { width: W, depth: D, height: H } = data.room;
-
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
-document.body.appendChild(renderer.domElement);
-document.getElementById('msg').remove();
-
-const scene = new THREE.Scene();
-scene.background = new THREE.Color('${COLORS.background}');
-const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(W * 0.5, Math.max(W, D) * 1.5, D * 1.9);
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(W / 2, 0, D / 2);
-controls.enableDamping = true;
-controls.maxPolarAngle = Math.PI / 2 - 0.05;
-
-scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-sun.position.set(W, H * 3, D);
-sun.castShadow = true;
-scene.add(sun);
-
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ color: data.floorColor, roughness: 0.75 }));
-floor.rotation.x = -Math.PI / 2;
-floor.position.set(W / 2, 0, D / 2);
-floor.receiveShadow = true;
-scene.add(floor);
-
-// Duong ke 1m de nhin ro gach/vat lieu san
-const gridPoints = [];
-for (let x = 1; x < W; x++) gridPoints.push(new THREE.Vector3(x, 0.003, 0), new THREE.Vector3(x, 0.003, D));
-for (let z = 1; z < D; z++) gridPoints.push(new THREE.Vector3(0, 0.003, z), new THREE.Vector3(W, 0.003, z));
-if (gridPoints.length) {
-  const grid = new THREE.LineSegments(
-    new THREE.BufferGeometry().setFromPoints(gridPoints),
-    new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.12 })
-  );
-  scene.add(grid);
-}
-
-// Tuong hoi trong suot de nhin thay noi that tu moi goc
-const wallMat = new THREE.MeshStandardMaterial({ color: data.wallColor, transparent: true, opacity: 0.35, depthWrite: false });
-for (const w of data.walls) {
-  const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(len, H, 0.08), wallMat);
-  wall.position.set((w.x1 + w.x2) / 2, H / 2, (w.y1 + w.y2) / 2);
-  wall.rotation.y = -Math.atan2(w.y2 - w.y1, w.x2 - w.x1);
-  wall.receiveShadow = true;
-  scene.add(wall);
-}
-
-const palette = [0xe67e22, 0x8b4513, 0x6b8e23, 0xcd853f, 0x556b2f, 0xa0522d];
-data.boxes.forEach((b, i) => {
-  const box = new THREE.Mesh(
-    new THREE.BoxGeometry(Math.max(b.w, 0.05), Math.max(b.h, 0.05), Math.max(b.d, 0.05)),
-    new THREE.MeshStandardMaterial({ color: palette[i % palette.length] })
-  );
-  box.position.set(b.x, b.h / 2, b.z);
-  box.rotation.y = -(b.rotation * Math.PI) / 180;
-  box.castShadow = true;
-  scene.add(box);
-});
-
-addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-});
-renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
-</script>
+<script>setTimeout(function(){var m=document.getElementById('msg');if(m)m.textContent='Không tải được 3D. Kiểm tra kết nối Internet rồi mở lại.';},15000);
+window.__SCENE__=${JSON.stringify(scene).replace(/</g, '\\u003c')};</script>
+<script type="module">${SCENE_SCRIPT}</script>
 </body></html>`;
 
-const View3D: React.FC<View3DProps> = ({
-  floorPlan,
-  placements,
-  furnitureById,
-  floorMaterial,
-  wallMaterial,
-}) => {
+const View3D: React.FC<View3DProps> = (props) => {
+  const { floorPlan, placements, furnitureById, floorMaterial, wallMaterial, skirtingMaterial, materials } = props;
   const html = useMemo(
-    () => buildHtml(buildScene(floorPlan, placements, furnitureById, floorMaterial, wallMaterial)),
-    [floorPlan, placements, furnitureById, floorMaterial, wallMaterial],
+    () =>
+      buildView3DHtml(
+        buildScene({ floorPlan, placements, furnitureById, floorMaterial, wallMaterial, skirtingMaterial, materials }),
+      ),
+    [floorPlan, placements, furnitureById, floorMaterial, wallMaterial, skirtingMaterial, materials],
   );
+  // Cung nguon voi may chu de tai anh van san/tuong
+  const baseUrl = toAssetUrl('/');
 
   return (
     <View style={styles.container}>
-      <WebView originWhitelist={['*']} source={{ html }} style={styles.webview} javaScriptEnabled />
+      <WebView originWhitelist={['*']} source={{ html, baseUrl }} style={styles.webview} javaScriptEnabled />
     </View>
   );
 };

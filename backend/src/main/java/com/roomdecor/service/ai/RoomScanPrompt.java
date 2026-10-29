@@ -34,7 +34,8 @@ final class RoomScanPrompt {
           a ceiling is usually 2.6-3.0 m high.
         - If part of the room is not visible in any photo, make the most plausible guess that is
           consistent with the visible walls.
-        - Description: 1-2 sentences in English.
+        - Description: 1-2 short sentences in Vietnamese (with proper diacritics), written for the
+          room owner, e.g. "Phòng khách hình chữ L, có cửa sổ lớn và một lối đi nhỏ dẫn ra cửa."
         """;
 
     private RoomScanPrompt() {}

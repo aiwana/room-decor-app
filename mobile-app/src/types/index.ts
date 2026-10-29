@@ -131,6 +131,15 @@ export interface Wall {
   y2: number;
 }
 
+/** OpeningDto: cua ra vao / cua so nam tren 1 tuong, toa do met nhu Wall */
+export interface Opening {
+  type: 'door' | 'window';
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
 /**
  * FloorPlanDto: mat bang 2D cua 1 anh phong, do AI quet ra (POST /api/ai/scan-room).
  * Kich thuoc tinh bang MET. Moi anh phong co toi da 1 mat bang.
@@ -142,6 +151,10 @@ export interface FloorPlan {
   roomDepth: number;
   ceilingHeight: number;
   walls: Wall[];
+  /** Cua ra vao / cua so AI thay duoc (mat bang mock cu luu tren may co the chua co) */
+  openings?: Opening[];
+  /** Cac anh goc phong chup them, dung chung voi anh chinh khi quet */
+  extraImageIds?: string[];
   pixelsPerMeter: number;
   description?: string | null;
   createdAt: string | null;
@@ -154,11 +167,18 @@ export interface ScanResult {
   description: string;
 }
 
-/** AiSuggestionResponse */
+/** AiSuggestionResponse: toan bo bo tri goi y (do cu giu id cu, do moi them co id "ai-...") */
 export interface AiSuggestion {
   placements: FurniturePlacement[];
+  /** Mon moi them tu danh muc (che do "add") */
+  newFurniture: Furniture[];
   description: string;
+  /** "ai" = Gemini, "rules" = backend tu xep theo luat (chua co khoa AI / AI dang ban) */
+  source: 'ai' | 'rules' | 'sample';
 }
+
+/** Kieu goi y: sap xep lai do dang co, hoac them do tu danh muc */
+export type AiSuggestMode = 'rearrange' | 'add';
 
 /* ============================ Frontend ============================ */
 

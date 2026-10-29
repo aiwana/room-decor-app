@@ -42,6 +42,15 @@ export const API_TIMEOUT = 15000;
 /** Upload anh phong lau hon request thuong */
 export const UPLOAD_TIMEOUT = 60000;
 
+/** AI quet phong (Gemini doc nhieu anh) co the mat 1-2 phut */
+export const SCAN_TIMEOUT = 180000;
+
+/** So anh goc phong chup them toi da (khop @Size(max = 5) cua ScanRoomRequest) */
+export const MAX_EXTRA_ROOM_IMAGES = 5;
+
+/** Tong dung luong anh gui cho AI (backend chan o 14 MB, de du 1 chut) */
+export const MAX_SCAN_IMAGES_BYTES = 13 * 1024 * 1024;
+
 /** Gia lap do tre mang o che do mock (ms) */
 export const MOCK_DELAY = 400;
 

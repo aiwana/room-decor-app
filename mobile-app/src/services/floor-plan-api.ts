@@ -1,23 +1,30 @@
 /**
  * src/services/floor-plan-api.ts
  * Mat bang 2D cua anh phong:
- *   POST /api/ai/scan-room { roomImageId }            -> AI quet anh, tao (hoac tao lai) mat bang
+ *   POST /api/ai/scan-room { roomImageId, extraImageIds?, referenceLengthMeters? }
+ *                                                      -> AI quet anh (co the kem anh goc phong), tao (hoac tao lai) mat bang
  *   GET  /api/floor-plans/by-room-image/{roomImageId} -> mat bang cua 1 anh (404 neu chua quet)
- *   PUT  /api/floor-plans/{id}                         -> sua kich thuoc / tuong
+ *   PUT  /api/floor-plans/{id}                         -> sua kich thuoc / tuong / cua
  *
- * Backend chua co OPENAI_API_KEY thi tra ve phong mau 4m x 4m.
+ * Backend chua co GEMINI_API_KEY / OPENAI_API_KEY thi tra ve phong mau 4m x 4m.
  * Che do mock: tao phong mau ngay tren may (STORAGE_KEYS.MOCK_FLOOR_PLANS).
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { MOCK_DELAY, STORAGE_KEYS, USE_MOCK } from '@/constants';
+import { MOCK_DELAY, SCAN_TIMEOUT, STORAGE_KEYS, USE_MOCK } from '@/constants';
 import type { FloorPlan, ScanResult, Wall } from '@/types';
 import { createId, delay } from '@/utils';
 
 import apiClient from './api-client';
 import { ApiError } from './api-error';
 
-export type FloorPlanPatch = Partial<Pick<FloorPlan, 'roomWidth' | 'roomDepth' | 'ceilingHeight' | 'walls'>>;
+/** Tuy chon khi quet: anh goc phong chup them + chieu dai 1 buc tuong do that (met) */
+export interface ScanOptions {
+  extraImageIds?: string[];
+  referenceLengthMeters?: number;
+}
+
+export type FloorPlanPatch = Partial<Pick<FloorPlan, 'roomWidth' | 'roomDepth' | 'ceilingHeight' | 'walls' | 'openings'>>;
 
 /** Tuong hinh chu nhat theo kich thuoc phong */
 export const rectangleWalls = (width: number, depth: number): Wall[] => [
@@ -49,17 +56,22 @@ const MOCK_DESCRIPTION = 'Phòng mẫu 4m x 4m (chế độ minh họa, chưa g�
 /* ----------------------------- API ----------------------------- */
 export const floorPlanApi = {
   /** AI quet anh phong -> mat bang moi (quet lai se thay mat bang cu) */
-  async scan(roomImageId: string): Promise<ScanResult> {
+  async scan(roomImageId: string, options: ScanOptions = {}): Promise<ScanResult> {
+    const extraImageIds = options.extraImageIds?.filter((id) => id !== roomImageId) ?? [];
     if (USE_MOCK) {
       await delay(MOCK_DELAY * 3);
       const now = new Date().toISOString();
+      // Giong MockVisionClient o backend: rong = chieu dai tuong mau (neu co), sau 4m, 1 cua ra vao
+      const width = options.referenceLengthMeters ?? 4;
       const floorPlan: FloorPlan = {
         id: createId('fp'),
         roomImageId,
-        roomWidth: 4,
+        roomWidth: width,
         roomDepth: 4,
         ceilingHeight: 2.7,
-        walls: rectangleWalls(4, 4),
+        walls: rectangleWalls(width, 4),
+        openings: [{ type: 'door', x1: 0.5, y1: 4, x2: 1.35, y2: 4 }],
+        extraImageIds,
         pixelsPerMeter: 100,
         description: MOCK_DESCRIPTION,
         createdAt: now,
@@ -68,7 +80,12 @@ export const floorPlanApi = {
       await writeMock({ ...(await readMock()), [roomImageId]: floorPlan });
       return { floorPlan, description: MOCK_DESCRIPTION };
     }
-    return apiClient.post<ScanResult>('/ai/scan-room', { roomImageId }).then((r) => r.data);
+    const body = {
+      roomImageId,
+      ...(extraImageIds.length > 0 ? { extraImageIds } : {}),
+      ...(options.referenceLengthMeters ? { referenceLengthMeters: options.referenceLengthMeters } : {}),
+    };
+    return apiClient.post<ScanResult>('/ai/scan-room', body, { timeout: SCAN_TIMEOUT }).then((r) => r.data);
   },
 
   /** Mat bang cua anh phong, null neu anh chua duoc quet */

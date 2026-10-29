@@ -47,7 +47,7 @@ Kết quả upload:
 | Phương thức | Đường dẫn | Mô tả |
 |---|---|---|
 | POST | `/api/ai/scan-room` | Quét ảnh phòng, tạo (hoặc tạo lại) mặt bằng 2D |
-| POST | `/api/ai/suggest-layout` | Gợi ý bố trí nội thất (hiện trả danh sách rỗng) |
+| POST | `/api/ai/suggest-layout` | AI gợi ý bố trí nội thất theo mặt bằng (xem bên dưới) |
 | POST | `/api/ai/describe-room/{roomImageId}` | Mô tả phòng (hiện là câu mẫu) |
 
 `POST /api/ai/scan-room`, body:
@@ -78,7 +78,7 @@ Kết quả:
     "walls": [ { "x1": 0, "y1": 0, "x2": 4, "y2": 0 }, { "x1": 4, "y1": 0, "x2": 4, "y2": 4 }, "..." ],
     "openings": [ { "type": "door", "x1": 0.5, "y1": 4, "x2": 1.35, "y2": 4 } ],
     "pixelsPerMeter": 100,
-    "description": "Mock scan: rectangular room 4.0m x 4.0m with one door, from 1 photo(s) (no API key configured)",
+    "description": "Phòng mẫu hình chữ nhật 4.0 m x 4.0 m, có 1 cửa ra vào, quét từ 1 ảnh (chưa cấu hình khoá AI).",
     "createdAt": "...",
     "updatedAt": "..."
   },
@@ -90,6 +90,41 @@ Kết quả:
 - `openings`: cửa ra vào (`door`) và cửa sổ (`window`), `(x1,y1)`–`(x2,y2)` là hai đầu của nó trên tường.
 
 Không có key AI (`GEMINI_API_KEY` / `OPENAI_API_KEY`) thì luôn trả phòng mẫu 4m x 4m có 1 cửa. Xem [03-chay-backend.md](03-chay-backend.md#6-ai-quét-phòng-ra-mặt-bằng-2d).
+
+`POST /api/ai/suggest-layout` (phòng phải **quét xong** và là của người đang đăng nhập), body:
+
+```json
+{
+  "roomImageId": "619faa53-...",
+  "mode": "rearrange",
+  "style": "hiện đại",
+  "note": "chừa lối đi rộng",
+  "items": [
+    { "placementId": "pl-1", "furnitureId": "882ce1a7-...", "name": "Sofa văng", "category": "sofa",
+      "width": 210, "depth": 90, "height": 85, "x": 0.5, "y": 0.6, "rotation": 0, "scale": 1 }
+  ]
+}
+```
+
+- `mode`: `rearrange` (mặc định) = AI sắp xếp lại các món trong `items`; `add` = giữ nguyên `items`, AI chọn thêm vài món từ danh mục nội thất.
+- `style`, `note` (không bắt buộc): phong cách và mong muốn của người dùng (tối đa 300 ký tự).
+- `items` (tối đa 40): đồ đang có trong phòng. Kích thước theo **cm**, `x`/`y` theo tỉ lệ `0..1` như placement. `furnitureId` là chuỗi (app có thể dùng đồ mẫu `sample-...`).
+
+Kết quả:
+
+```json
+{
+  "placements": [ { "id": "pl-1", "furnitureId": "882ce1a7-...", "x": 0.28, "y": 0.13, "rotation": 0, "scale": 1 } ],
+  "newFurniture": [ { "id": "...", "name": "Đèn cây", "category": "lighting", "width": 40, "...": "..." } ],
+  "description": "Sofa đặt sát tường dài, bàn trà ở giữa, chừa lối đi trước cửa.",
+  "source": "ai"
+}
+```
+
+- `placements`: toàn bộ bố trí (đồ cũ giữ `id` cũ, đồ mới thêm có `id` bắt đầu bằng `ai-`).
+- `newFurniture`: thông tin các món mới thêm từ danh mục (chỉ có ở `add`).
+- `source`: `ai` (Gemini) hoặc `rules` (chưa có `GEMINI_API_KEY`, hoặc AI đang bận: backend tự xếp theo luật đơn giản, đồ lớn sát tường, không chắn cửa).
+- AI chỉ nhận **mặt bằng và danh sách đồ** (không gửi ảnh). Kết quả luôn được backend kiểm tra lại: bỏ món lạ, đẩy món ra ngoài tường vào trong, không để đồ chắn trước cửa ra vào (0,8 m).
 
 ## Mặt bằng 2D
 

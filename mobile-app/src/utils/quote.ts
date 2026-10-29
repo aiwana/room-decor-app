@@ -1,6 +1,7 @@
 import type { FloorPlan, Furniture, FurniturePlacement, Material } from '@/types';
 
 import { formatArea, formatPrice } from './index';
+import { floorPlanPolygon, polygonArea, polygonPerimeter } from './room-geometry';
 
 export interface QuoteLine {
   key: string;
@@ -68,10 +69,12 @@ export const buildQuote = ({
   let skirtingLength: number | null = null;
 
   if (floorPlan) {
-    const { roomWidth, roomDepth, ceilingHeight } = floorPlan;
-    floorArea = roomWidth * roomDepth;
-    wallArea = 2 * (roomWidth + roomDepth) * ceilingHeight;
-    skirtingLength = 2 * (roomWidth + roomDepth);
+    // Tinh theo hinh dang that cua phong (phong chu L nho hon hinh chu nhat bao ngoai)
+    const polygon = floorPlanPolygon(floorPlan);
+    const perimeter = polygonPerimeter(polygon);
+    floorArea = polygonArea(polygon);
+    wallArea = perimeter * floorPlan.ceilingHeight;
+    skirtingLength = perimeter;
 
     const floor = materials.find((m) => m.code === floorMaterial);
     const wall = materials.find((m) => m.code === wallMaterial);

@@ -1,6 +1,9 @@
 package com.roomdecor.config;
 
+import com.roomdecor.service.RuleBasedLayoutAdvisor;
+import com.roomdecor.service.ai.GeminiLayoutAdvisor;
 import com.roomdecor.service.ai.GeminiVisionClient;
+import com.roomdecor.service.ai.LayoutAdvisor;
 import com.roomdecor.service.ai.MockVisionClient;
 import com.roomdecor.service.ai.OpenAiVisionClient;
 import com.roomdecor.service.ai.RoomVisionClient;
@@ -64,5 +67,26 @@ public class AiConfig {
             log.info("AI room scan: using MockVisionClient");
         }
         return new MockVisionClient();
+    }
+
+    /**
+     * Layout suggestion: Gemini (text only) when a Gemini key is set and AI_PROVIDER is blank or "gemini",
+     * otherwise simple rules (OpenAI is only wired for the room scan).
+     */
+    @Bean
+    public LayoutAdvisor layoutAdvisor(
+        @Value("${app.ai.provider:}") String provider,
+        @Value("${app.ai.gemini.api-key:}") String geminiKey,
+        @Value("${app.ai.gemini.model:gemini-3.5-flash}") String geminiModel,
+        @Value("${app.ai.gemini.thinking-level:low}") String geminiThinkingLevel
+    ) {
+        String selected = provider == null ? "" : provider.trim().toLowerCase();
+        boolean geminiAllowed = selected.isBlank() || "gemini".equals(selected);
+        if (geminiAllowed && geminiKey != null && !geminiKey.isBlank()) {
+            log.info("AI layout suggestion: using Gemini model {}", geminiModel);
+            return new GeminiLayoutAdvisor(geminiKey, geminiModel, geminiThinkingLevel);
+        }
+        log.info("AI layout suggestion: using simple rules (no Gemini key or AI_PROVIDER={})", selected);
+        return new RuleBasedLayoutAdvisor();
     }
 }
