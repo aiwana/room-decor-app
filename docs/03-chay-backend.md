@@ -80,11 +80,11 @@ Kết quả chi tiết nằm trong `target/surefire-reports/`.
 
 ## 6. AI quét phòng ra mặt bằng 2D
 
-`POST /api/ai/scan-room` nhận `roomImageId` của ảnh đã upload, tạo bảng ghi `floor_plans` (kích thước phòng theo mét, danh sách tường).
+`POST /api/ai/scan-room` nhận `roomImageId` của ảnh chính (có thể kèm tối đa 5 ảnh phụ `extraImageIds` và số đo thật `referenceLengthMeters`, xem [api.md](api.md#ai)), tạo bảng ghi `floor_plans` (kích thước phòng theo mét, các bức tường dạng đa giác, cửa ra vào và cửa sổ). Backend đọc ảnh từ ổ đĩa và gửi thẳng cho AI, nên không cần địa chỉ công khai.
 
-- **Không có `OPENAI_API_KEY`** (mặc định): `MockVisionClient` trả về phòng hình chữ nhật 4m x 4m, trần 2,7m. Đủ để làm và test giao diện.
-- **Có `OPENAI_API_KEY`**: `OpenAiVisionClient` gửi **URL ảnh** cho GPT-4o. OpenAI phải tải được ảnh qua Internet, nên `STORAGE_BASE_URL` phải là địa chỉ công khai. Với `http://localhost:8080/files` (chạy trên máy cá nhân), OpenAI không tải được ảnh và API trả lỗi 400.
-- Muốn đổi sang nhà cung cấp khác (Gemini...): viết class mới `implements RoomVisionClient` và chọn nó trong `config/AiConfig.java`.
+- **Chọn AI** bằng `AI_PROVIDER` trong `.env` (`gemini` | `openai` | `mock`). Để trống thì tự chọn: có `GEMINI_API_KEY` dùng Gemini, không thì OpenAI, không có key nào thì Mock.
+- **Mock** (mặc định khi không có key): `MockVisionClient` trả về phòng hình chữ nhật 4m x 4m, trần 2,7m, 1 cửa ra vào. Đủ để làm và test giao diện.
+- **Gemini / OpenAI**: tất cả ảnh được gửi trong **1 lần gọi**. Kết quả được `FloorPlanGeometry` làm sạch (dời về gốc 0,0, bỏ số vô lý, quá hỏng thì về phòng 4m x 4m) trước khi lưu. Lúc khởi động, log ghi `AI room scan: using ...` để biết đang dùng AI nào.
 
 ## Cấu trúc code
 

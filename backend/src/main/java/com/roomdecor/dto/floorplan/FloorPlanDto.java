@@ -7,10 +7,12 @@ import java.util.UUID;
 public record FloorPlanDto(
     UUID id,
     UUID roomImageId,
+    List<UUID> extraImageIds,
     Double roomWidth,
     Double roomDepth,
     Double ceilingHeight,
     List<WallDto> walls,
+    List<OpeningDto> openings,
     Integer pixelsPerMeter,
     String description,
     Instant createdAt,

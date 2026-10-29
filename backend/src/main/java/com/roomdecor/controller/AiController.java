@@ -23,7 +23,7 @@ public class AiController {
     @PostMapping("/scan-room")
     public ResponseEntity<ScanRoomResponse> scanRoom(@Valid @RequestBody ScanRoomRequest request, Authentication auth) {
         UUID userId = (UUID) auth.getPrincipal();
-        return ResponseEntity.ok(aiService.scanRoom(request.roomImageId(), userId));
+        return ResponseEntity.ok(aiService.scanRoom(request, userId));
     }
 
     @PostMapping("/suggest-layout")

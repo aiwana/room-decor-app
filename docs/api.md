@@ -50,19 +50,35 @@ Kết quả upload:
 | POST | `/api/ai/suggest-layout` | Gợi ý bố trí nội thất (hiện trả danh sách rỗng) |
 | POST | `/api/ai/describe-room/{roomImageId}` | Mô tả phòng (hiện là câu mẫu) |
 
-`POST /api/ai/scan-room`, body `{ "roomImageId": "..." }`, kết quả:
+`POST /api/ai/scan-room`, body:
+
+```json
+{
+  "roomImageId": "619faa53-...",
+  "extraImageIds": ["a1b2...", "c3d4...", "e5f6..."],
+  "referenceLengthMeters": 3.2
+}
+```
+
+- `roomImageId` (bắt buộc): ảnh chính, mặt bằng gắn với ảnh này.
+- `extraImageIds` (không bắt buộc, tối đa 5): ảnh phụ của **cùng căn phòng**, ví dụ mỗi góc 1 ảnh, theo thứ tự đi quanh phòng. Tất cả ảnh phải là của người đang đăng nhập; tổng dung lượng tối đa 14 MB.
+- `referenceLengthMeters` (không bắt buộc, 0,5 đến 30): chiều dài thật của **bức tường đối diện máy ảnh trong ảnh chính**, để AI căn tỷ lệ.
+
+Kết quả:
 
 ```json
 {
   "floorPlan": {
     "id": "f444bda4-...",
     "roomImageId": "619faa53-...",
+    "extraImageIds": ["a1b2...", "c3d4...", "e5f6..."],
     "roomWidth": 4.0,
     "roomDepth": 4.0,
     "ceilingHeight": 2.7,
     "walls": [ { "x1": 0, "y1": 0, "x2": 4, "y2": 0 }, { "x1": 4, "y1": 0, "x2": 4, "y2": 4 }, "..." ],
+    "openings": [ { "type": "door", "x1": 0.5, "y1": 4, "x2": 1.35, "y2": 4 } ],
     "pixelsPerMeter": 100,
-    "description": "Mock scan: rectangular room 4m x 4m (no API key configured)",
+    "description": "Mock scan: rectangular room 4.0m x 4.0m with one door, from 1 photo(s) (no API key configured)",
     "createdAt": "...",
     "updatedAt": "..."
   },
@@ -70,7 +86,10 @@ Kết quả upload:
 }
 ```
 
-Không có `OPENAI_API_KEY` thì luôn trả phòng mẫu 4m x 4m. Xem [03-chay-backend.md](03-chay-backend.md#6-ai-quét-phòng-ra-mặt-bằng-2d).
+- `walls`: các bức tường nối liền thành **đa giác kín** (phòng chữ L, tường xiên... có nhiều hơn 4 bức). Toạ độ theo mét, góc trên trái là (0,0), `roomWidth`/`roomDepth` là hình chữ nhật bao ngoài.
+- `openings`: cửa ra vào (`door`) và cửa sổ (`window`), `(x1,y1)`–`(x2,y2)` là hai đầu của nó trên tường.
+
+Không có key AI (`GEMINI_API_KEY` / `OPENAI_API_KEY`) thì luôn trả phòng mẫu 4m x 4m có 1 cửa. Xem [03-chay-backend.md](03-chay-backend.md#6-ai-quét-phòng-ra-mặt-bằng-2d).
 
 ## Mặt bằng 2D
 
@@ -78,7 +97,7 @@ Không có `OPENAI_API_KEY` thì luôn trả phòng mẫu 4m x 4m. Xem [03-chay-
 |---|---|---|
 | GET | `/api/floor-plans/{id}` | Mặt bằng theo id |
 | GET | `/api/floor-plans/by-room-image/{roomImageId}` | Mặt bằng của một ảnh (404 nếu ảnh chưa quét) |
-| PUT | `/api/floor-plans/{id}` | Sửa: `{ roomWidth?, roomDepth?, ceilingHeight?, walls?, pixelsPerMeter? }`, trường nào bỏ trống thì giữ nguyên |
+| PUT | `/api/floor-plans/{id}` | Sửa: `{ roomWidth?, roomDepth?, ceilingHeight?, walls?, openings?, pixelsPerMeter? }`, trường nào bỏ trống thì giữ nguyên |
 
 Tọa độ tính bằng **mét**, gốc `(0,0)` ở góc trên trái khi nhìn từ trên xuống; `x` theo chiều rộng, `y` theo chiều sâu.
 

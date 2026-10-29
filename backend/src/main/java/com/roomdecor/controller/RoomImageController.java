@@ -3,6 +3,7 @@ package com.roomdecor.controller;
 import com.roomdecor.dto.roomimage.RoomImageDto;
 import com.roomdecor.mapper.RoomImageMapper;
 import com.roomdecor.service.RoomImageService;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +22,7 @@ public class RoomImageController {
         this.roomImageService = roomImageService;
     }
 
-    @PostMapping("/upload")
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<RoomImageDto> upload(@RequestParam("file") MultipartFile file, Authentication auth) {
         UUID userId = (UUID) auth.getPrincipal();
         return ResponseEntity.ok(RoomImageMapper.toDto(roomImageService.upload(file, userId)));

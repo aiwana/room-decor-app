@@ -8,6 +8,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -49,6 +50,18 @@ public class FloorPlan {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false)
     private List<WallSegment> walls;
+
+    /** Doors and windows lying on the walls: [{type,x1,y1,x2,y2}, ...] in meters */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb", nullable = false)
+    @Builder.Default
+    private List<Opening> openings = new ArrayList<>();
+
+    /** Extra room photos (besides roomImage) that were sent to the AI for this scan */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "extra_image_ids", columnDefinition = "jsonb", nullable = false)
+    @Builder.Default
+    private List<UUID> extraImageIds = new ArrayList<>();
 
     /** Pixel scale: how many pixels represent 1 meter in the 2D canvas */
     @Column(nullable = false)

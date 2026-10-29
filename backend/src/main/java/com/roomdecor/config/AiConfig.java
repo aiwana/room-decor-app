@@ -25,7 +25,8 @@ public class AiConfig {
         @Value("${app.ai.openai.api-key:}") String openAiKey,
         @Value("${app.ai.openai.model:gpt-4o}") String openAiModel,
         @Value("${app.ai.gemini.api-key:}") String geminiKey,
-        @Value("${app.ai.gemini.model:gemini-2.5-flash}") String geminiModel
+        @Value("${app.ai.gemini.model:gemini-3.5-flash}") String geminiModel,
+        @Value("${app.ai.gemini.thinking-level:low}") String geminiThinkingLevel
     ) {
         String selected = provider == null ? "" : provider.trim().toLowerCase();
         if (selected.isBlank()) {
@@ -43,8 +44,9 @@ public class AiConfig {
                 log.warn("AI room scan: AI_PROVIDER=gemini but GEMINI_API_KEY is blank, using MockVisionClient");
                 return new MockVisionClient();
             }
-            log.info("AI room scan: using Gemini model {}", geminiModel);
-            return new GeminiVisionClient(geminiKey, geminiModel);
+            log.info("AI room scan: using Gemini model {} (thinking level: {})", geminiModel,
+                geminiThinkingLevel == null || geminiThinkingLevel.isBlank() ? "model default" : geminiThinkingLevel);
+            return new GeminiVisionClient(geminiKey, geminiModel, geminiThinkingLevel);
         }
 
         if ("openai".equals(selected)) {

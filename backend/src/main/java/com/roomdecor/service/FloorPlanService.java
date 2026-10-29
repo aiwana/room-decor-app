@@ -3,6 +3,7 @@ package com.roomdecor.service;
 import com.roomdecor.dto.floorplan.FloorPlanDto;
 import com.roomdecor.dto.floorplan.UpdateFloorPlanRequest;
 import com.roomdecor.entity.FloorPlan;
+import com.roomdecor.entity.Opening;
 import com.roomdecor.entity.RoomImage;
 import com.roomdecor.entity.WallSegment;
 import com.roomdecor.exception.BadRequestException;
@@ -13,6 +14,7 @@ import com.roomdecor.service.ai.RoomVisionClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -44,23 +46,25 @@ public class FloorPlanService {
 
     /**
      * Create a floor plan from an AI analysis result.
+     * saveAndFlush so createdAt/updatedAt are filled in before the entity is mapped to a DTO.
      */
     public FloorPlan createFromScan(RoomImage roomImage,
+                                    List<UUID> extraImageIds,
                                     RoomVisionClient.RoomAnalysisResult result,
                                     int pixelsPerMeter) {
-        List<WallSegment> walls = result.walls();
-
         FloorPlan fp = FloorPlan.builder()
             .roomImage(roomImage)
+            .extraImageIds(new ArrayList<>(extraImageIds))
             .roomWidth(result.roomWidthMeters())
             .roomDepth(result.roomDepthMeters())
             .ceilingHeight(result.ceilingHeightMeters())
-            .walls(walls)
+            .walls(result.walls())
+            .openings(new ArrayList<>(result.openings()))
             .pixelsPerMeter(pixelsPerMeter)
             .description(result.description())
             .build();
 
-        return floorPlanRepository.save(fp);
+        return floorPlanRepository.saveAndFlush(fp);
     }
 
     /**
@@ -81,8 +85,20 @@ public class FloorPlanService {
                 .toList();
             fp.setWalls(walls);
         }
+        if (request.openings() != null) {
+            List<Opening> openings = request.openings().stream()
+                .map(FloorPlanMapper::toOpeningEntity)
+                .toList();
+            for (Opening o : openings) {
+                if (!Opening.DOOR.equals(o.type()) && !Opening.WINDOW.equals(o.type())) {
+                    throw new BadRequestException("Opening type must be 'door' or 'window'");
+                }
+            }
+            fp.setOpenings(new ArrayList<>(openings));
+        }
 
-        return FloorPlanMapper.toDto(fp);
+        // Flush so updatedAt reflects this change in the response
+        return FloorPlanMapper.toDto(floorPlanRepository.saveAndFlush(fp));
     }
 
     private void assertOwnership(FloorPlan fp, UUID userId) {
@@ -95,6 +111,6 @@ public class FloorPlanService {
     public RoomVisionClient.RoomAnalysisResult scanResult(
         double w, double d, double h, List<WallSegment> walls, String desc
     ) {
-        return new RoomVisionClient.RoomAnalysisResult(w, d, h, walls, desc);
+        return new RoomVisionClient.RoomAnalysisResult(w, d, h, walls, List.of(), desc);
     }
 }

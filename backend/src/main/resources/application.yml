@@ -38,4 +38,6 @@ app:
       model: ${OPENAI_MODEL:gpt-4o}
     gemini:
       api-key: ${GEMINI_API_KEY:}
-      model: ${GEMINI_MODEL:gemini-2.5-flash}
+      model: ${GEMINI_MODEL:gemini-3.5-flash}
+      # minimal | low | medium | high; blank = model default (high on Gemini 3, slow for multi-photo scans)
+      thinking-level: ${GEMINI_THINKING_LEVEL:low}

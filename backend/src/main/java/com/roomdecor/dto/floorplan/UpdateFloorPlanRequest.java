@@ -1,7 +1,5 @@
 package com.roomdecor.dto.floorplan;
 
-import jakarta.validation.constraints.NotNull;
-
 import java.util.List;
 
 /**
@@ -12,5 +10,6 @@ public record UpdateFloorPlanRequest(
     Double roomDepth,
     Double ceilingHeight,
     List<WallDto> walls,
+    List<OpeningDto> openings,
     Integer pixelsPerMeter
 ) {}
