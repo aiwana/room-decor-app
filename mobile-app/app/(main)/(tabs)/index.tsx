@@ -1,12 +1,15 @@
 /**
  * app/(main)/(tabs)/index.tsx
- * HOME - giu bo cuc ban cu (dark theme, 2 o gradient, danh sach ngang), doi noi dung:
- *   Header | Tim noi that | 2 nut lon (Chup phong / Chon anh) | Quick Actions
- *   | Thiet ke gan day | Noi that noi bat | Cam hung
+ * HOME. Bo cuc:
+ *   Header | Tim noi that + Danh muc | 2 o lon (Chup phong / Chon anh, giu nhu ban cu)
+ *   | Tiep tuc thiet ke gan nhat | Thiet ke gan day | Noi that noi bat | Cam hung
+ * Da bo hang 4 icon tron va nut goc phai: "Thiet ke moi", "Cua toi" da co o thanh tab,
+ * "Cai dat" nam trong Ho so (truoc day 3 loi vao cung 1 cho lam man hinh roi).
  */
 import { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,24 +18,17 @@ import SectionHeader from '@/components/common/SectionHeader';
 import DesignCard from '@/components/design/DesignCard';
 import FurnitureCard from '@/components/furniture/FurnitureCard';
 import InspirationCard from '@/components/home/InspirationCard';
-import QuickActionItem from '@/components/home/QuickActionItem';
-import { COLORS, SPACING } from '@/constants/colors';
+import { COLORS, RADIUS, SPACING, TOUCH_MIN, TYPE } from '@/constants/colors';
 import { INSPIRATIONS } from '@/constants/inspirations';
 import { useDesigns } from '@/hooks/useDesigns';
 import { useFurniture } from '@/hooks/useFurniture';
 import { type PickedImage, useRoomImagePicker } from '@/hooks/useRoomImagePicker';
 import { useAuthStore } from '@/store/auth-store';
-import type { DesignDetail, Furniture, QuickAction } from '@/types';
+import type { DesignDetail, Furniture } from '@/types';
+import { formatDate } from '@/utils';
 
 const GRADIENT_GREEN = [COLORS.greenFrom, COLORS.greenTo] as const;
 const GRADIENT_SLATE = [COLORS.slateFrom, COLORS.slateTo] as const;
-
-const QUICK_ACTIONS: QuickAction[] = [
-  { id: 'qa-1', label: 'Thiết kế mới', iconName: 'add-circle', href: '/new-design' },
-  { id: 'qa-2', label: 'Của tôi', iconName: 'albums', href: '/designs' },
-  { id: 'qa-3', label: 'Nội thất', iconName: 'grid', href: '/furniture' },
-  { id: 'qa-4', label: 'Cài đặt', iconName: 'settings', href: '/settings' },
-];
 
 const RECENT_LIMIT = 6;
 const FEATURED_LIMIT = 8;
@@ -45,7 +41,8 @@ export default function HomeScreen() {
   const { pickFromCamera, pickFromGallery } = useRoomImagePicker();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const recentDesigns = designs.slice(0, RECENT_LIMIT);
+  const lastDesign = designs[0];
+  const recentDesigns = designs.slice(1, RECENT_LIMIT + 1);
   const featured = furniture.slice(0, FEATURED_LIMIT);
 
   /* ---------------- Handlers ---------------- */
@@ -76,50 +73,69 @@ export default function HomeScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {/* ===== 1. HEADER ===== */}
         <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Text style={styles.headerTitle}>RoomDecor</Text>
+          <Text style={styles.headerTitle}>RoomDecor</Text>
+          {user?.name ? (
             <Text style={styles.headerSubtitle} numberOfLines={1}>
-              Xin chào {user?.name ?? ''}, sắp xếp lại căn phòng nào ✨
+              Xin chào {user.name}
             </Text>
-          </View>
-          <Pressable
-            style={styles.headerButton}
-            onPress={(): void => router.navigate('/designs')}
-            accessibilityLabel="Thiết kế của tôi"
-            accessibilityRole="button"
-          >
-            <Ionicons name="albums-outline" size={24} color={COLORS.textPrimary} />
-          </Pressable>
-        </View>
-
-        {/* ===== Tim noi that ===== */}
-        <View style={styles.searchRow}>
-          <Ionicons name="search" size={18} color={COLORS.inactive} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Tìm nội thất: sofa, bàn trà, đèn..."
-            placeholderTextColor={COLORS.inactive}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            returnKeyType="search"
-            onSubmitEditing={handleSearch}
-          />
-          {searchQuery.length > 0 ? (
-            <Pressable onPress={(): void => setSearchQuery('')} hitSlop={8} accessibilityLabel="Xoá từ khoá">
-              <Ionicons name="close-circle" size={18} color={COLORS.inactive} />
-            </Pressable>
           ) : null}
         </View>
 
-        {/* ===== 2. MAIN ACTIONS (2 o gradient) ===== */}
+        {/* ===== TIM NOI THAT + DANH MUC (vi tri cu: ngay duoi header) ===== */}
+        <View style={styles.searchBar}>
+          <View style={styles.searchRow}>
+            <Ionicons name="search" size={18} color={COLORS.inactive} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Tìm nội thất: sofa, bàn trà, đèn..."
+              placeholderTextColor={COLORS.inactive}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              returnKeyType="search"
+              onSubmitEditing={handleSearch}
+              accessibilityLabel="Tìm nội thất"
+            />
+            {searchQuery.length > 0 ? (
+              <Pressable
+                onPress={(): void => setSearchQuery('')}
+                hitSlop={13}
+                accessibilityRole="button"
+                accessibilityLabel="Xoá từ khoá"
+              >
+                <Ionicons name="close-circle" size={18} color={COLORS.inactive} />
+              </Pressable>
+            ) : null}
+          </View>
+          <Pressable
+            style={({ pressed }) => [styles.catalogButton, pressed && styles.pressed]}
+            onPress={(): void => router.push('/furniture')}
+            accessibilityRole="button"
+            accessibilityLabel="Danh mục nội thất"
+          >
+            <Ionicons name="grid-outline" size={20} color={COLORS.textPrimary} />
+          </Pressable>
+        </View>
+
+        {/* ===== 2. VIEC CHINH: 2 O LON (giu mau + vi tri ban cu) ===== */}
         <View style={styles.mainActions}>
-          <Pressable style={styles.actionFlex} onPress={(): void => void pickFromCamera().then(openNewDesign)} accessibilityRole="button">
+          <Pressable
+            style={({ pressed }) => [styles.actionFlex, pressed && styles.pressed]}
+            onPress={(): void => void pickFromCamera().then(openNewDesign)}
+            accessibilityRole="button"
+            accessibilityLabel="Chụp phòng mới"
+          >
             <LinearGradient colors={GRADIENT_GREEN} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionBox}>
-              <Ionicons name="camera" size={36} color={COLORS.textPrimary} />
-              <Text style={styles.actionBoxText}>Chụp phòng mới</Text>
+              {/* Chu toi tren nen xanh la: chu trang chi ~2:1, chu toi ~8:1 */}
+              <Ionicons name="camera" size={36} color={COLORS.onAccent} />
+              <Text style={[styles.actionBoxText, styles.actionBoxTextDark]}>Chụp phòng mới</Text>
             </LinearGradient>
           </Pressable>
-          <Pressable style={styles.actionFlex} onPress={(): void => void pickFromGallery().then(openNewDesign)} accessibilityRole="button">
+          <Pressable
+            style={({ pressed }) => [styles.actionFlex, pressed && styles.pressed]}
+            onPress={(): void => void pickFromGallery().then(openNewDesign)}
+            accessibilityRole="button"
+            accessibilityLabel="Chọn ảnh phòng"
+          >
             <LinearGradient colors={GRADIENT_SLATE} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionBox}>
               <Ionicons name="images" size={36} color={COLORS.textPrimary} />
               <Text style={styles.actionBoxText}>Chọn ảnh phòng</Text>
@@ -127,14 +143,35 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {/* ===== 3. QUICK ACTIONS ===== */}
-        <View style={styles.quickActions}>
-          {QUICK_ACTIONS.map((action) => (
-            <QuickActionItem key={action.id} action={action} onPress={(a): void => router.navigate(a.href)} />
-          ))}
-        </View>
+        {/* ===== 3. TIEP TUC THIET KE GAN NHAT ===== */}
+        {lastDesign ? (
+          <Pressable
+            style={({ pressed }) => [styles.continueRow, pressed && styles.pressed]}
+            onPress={(): void => handleDesignPress(lastDesign)}
+            accessibilityRole="button"
+            accessibilityLabel={`Tiếp tục thiết kế ${lastDesign.name}`}
+          >
+            {lastDesign.roomImageUri ? (
+              <Image source={{ uri: lastDesign.roomImageUri }} style={styles.continueThumb} contentFit="cover" />
+            ) : (
+              <View style={[styles.continueThumb, styles.continueThumbEmpty]}>
+                <Ionicons name="image-outline" size={22} color={COLORS.inactive} />
+              </View>
+            )}
+            <View style={styles.continueText}>
+              <Text style={styles.continueLabel}>Tiếp tục thiết kế</Text>
+              <Text style={styles.continueName} numberOfLines={1}>
+                {lastDesign.name}
+              </Text>
+              <Text style={styles.continueMeta} numberOfLines={1}>
+                {lastDesign.placements.length} món nội thất · {formatDate(lastDesign.updatedAt)}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={COLORS.inactive} />
+          </Pressable>
+        ) : null}
 
-        {/* ===== 4. THIET KE GAN DAY (an neu chua co) ===== */}
+        {/* ===== 5. THIET KE GAN DAY (tru thiet ke dang o "Tiep tuc") ===== */}
         {recentDesigns.length > 0 ? (
           <>
             <SectionHeader title="Thiết kế gần đây" actionLabel="Xem tất cả" onAction={(): void => router.navigate('/designs')} />
@@ -149,7 +186,7 @@ export default function HomeScreen() {
           </>
         ) : null}
 
-        {/* ===== 5. NOI THAT NOI BAT ===== */}
+        {/* ===== 6. NOI THAT NOI BAT ===== */}
         <SectionHeader title="Nội thất nổi bật" actionLabel="Xem tất cả" onAction={(): void => router.push('/furniture')} />
         {furnitureLoading && featured.length === 0 ? (
           <ActivityIndicator color={COLORS.accent} />
@@ -166,7 +203,7 @@ export default function HomeScreen() {
           />
         )}
 
-        {/* ===== 6. CAM HUNG ===== */}
+        {/* ===== 7. CAM HUNG ===== */}
         <SectionHeader title="Cảm hứng thiết kế" />
         <FlatList
           horizontal
@@ -184,34 +221,53 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
   scrollContent: { paddingBottom: SPACING.xl },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.sm,
-    paddingBottom: 4,
-  },
-  headerText: { flex: 1 },
-  headerTitle: { fontSize: 26, fontWeight: 'bold', color: COLORS.textPrimary },
-  headerSubtitle: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2 },
-  headerButton: { padding: 4 },
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: SPACING.md,
-    marginTop: 12,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 14,
-  },
-  searchInput: { flex: 1, marginLeft: 8, fontSize: 14, color: COLORS.textPrimary },
+  pressed: { opacity: 0.85 },
+  header: { paddingHorizontal: SPACING.md, paddingTop: SPACING.sm },
+  headerTitle: { ...TYPE.title, color: COLORS.textPrimary },
+  headerSubtitle: { ...TYPE.label, fontWeight: '400', color: COLORS.textSecondary, marginTop: 2 },
+
   mainActions: { flexDirection: 'row', gap: 12, marginTop: SPACING.lg, paddingHorizontal: SPACING.md },
   actionFlex: { flex: 1 },
-  actionBox: { height: 140, borderRadius: 16, padding: SPACING.md, alignItems: 'center', justifyContent: 'center' },
-  actionBoxText: { marginTop: 10, fontSize: 16, fontWeight: 'bold', color: COLORS.textPrimary, textAlign: 'center' },
-  quickActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: SPACING.lg, paddingHorizontal: SPACING.md },
+  actionBox: { height: 140, borderRadius: RADIUS.lg, padding: SPACING.md, alignItems: 'center', justifyContent: 'center' },
+  actionBoxText: { ...TYPE.body, fontWeight: '700', marginTop: 10, color: COLORS.textPrimary, textAlign: 'center' },
+  actionBoxTextDark: { color: COLORS.onAccent },
+
+  continueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.md,
+    padding: 12,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surface,
+  },
+  continueThumb: { width: 56, height: 56, borderRadius: RADIUS.sm, backgroundColor: COLORS.surfaceAlt },
+  continueThumbEmpty: { alignItems: 'center', justifyContent: 'center' },
+  continueText: { flex: 1 },
+  continueLabel: { ...TYPE.caption, color: COLORS.accent, fontWeight: '600' },
+  continueName: { ...TYPE.body, fontWeight: '600', color: COLORS.textPrimary, marginTop: 2 },
+  continueMeta: { ...TYPE.caption, color: COLORS.textSecondary, marginTop: 2 },
+
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginHorizontal: SPACING.md, marginTop: 12 },
+  searchRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: TOUCH_MIN,
+    borderRadius: TOUCH_MIN / 2,
+    backgroundColor: COLORS.fill,
+    paddingHorizontal: 14,
+  },
+  searchInput: { flex: 1, marginLeft: SPACING.sm, ...TYPE.body, color: COLORS.textPrimary },
+  catalogButton: {
+    width: TOUCH_MIN,
+    height: TOUCH_MIN,
+    borderRadius: TOUCH_MIN / 2,
+    backgroundColor: COLORS.fill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   listContent: { paddingHorizontal: SPACING.md },
-  sectionMessage: { paddingHorizontal: SPACING.md, fontSize: 13, color: COLORS.textSecondary },
+  sectionMessage: { paddingHorizontal: SPACING.md, ...TYPE.label, fontWeight: '400', color: COLORS.textSecondary },
 });

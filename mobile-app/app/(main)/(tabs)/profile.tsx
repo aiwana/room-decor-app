@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.surfaceAlt,
   },
-  roleAdmin: { backgroundColor: COLORS.accent },
+  roleAdmin: { backgroundColor: COLORS.accentSoft },
   roleText: { fontSize: 11, fontWeight: '700', color: COLORS.textPrimary },
   notice: { marginHorizontal: 0, marginTop: SPACING.md, marginBottom: 0 },
   stats: { flexDirection: 'row', gap: 12, marginTop: SPACING.lg },

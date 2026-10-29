@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     padding: 12,
     borderRadius: RADIUS.sm,
-    backgroundColor: 'rgba(231,76,60,0.12)',
+    backgroundColor: COLORS.dangerSoft,
     marginBottom: SPACING.md,
   },
   errorText: { flex: 1, color: COLORS.danger, fontSize: 13 },

@@ -5,7 +5,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { COLORS, SPACING } from '@/constants/colors';
+import { COLORS, SPACING, TYPE } from '@/constants/colors';
 
 interface SectionHeaderProps {
   title: string;
@@ -17,7 +17,7 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({ title, actionLabel, onAct
   <View style={styles.row}>
     <Text style={styles.title}>{title}</Text>
     {actionLabel && onAction ? (
-      <Pressable onPress={onAction} hitSlop={8} accessibilityRole="button">
+      <Pressable onPress={onAction} hitSlop={14} accessibilityRole="button">
         <Text style={styles.action}>{actionLabel}</Text>
       </Pressable>
     ) : null}
@@ -33,8 +33,8 @@ const styles = StyleSheet.create({
     marginTop: 28,
     marginBottom: 12,
   },
-  title: { fontSize: 18, fontWeight: 'bold', color: COLORS.textPrimary },
-  action: { fontSize: 13, color: COLORS.accent, fontWeight: '600' },
+  title: { ...TYPE.headline, color: COLORS.textPrimary },
+  action: { ...TYPE.label, color: COLORS.accent },
 });
 
 export default SectionHeader;

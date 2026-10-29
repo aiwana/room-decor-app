@@ -6,7 +6,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 
-import { COLORS, RADIUS } from '@/constants/colors';
+import { COLORS, RADIUS, TYPE } from '@/constants/colors';
 import type { Inspiration } from '@/types';
 
 interface InspirationCardProps {
@@ -19,6 +19,7 @@ const InspirationCard: React.FC<InspirationCardProps> = ({ item, onPress }) => (
     onPress={(): void => onPress(item)}
     style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     accessibilityRole="button"
+    accessibilityLabel={item.title}
   >
     <Image source={{ uri: item.imageUrl }} style={styles.image} contentFit="cover" transition={200} />
     <View style={styles.info}>
@@ -43,8 +44,8 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
   image: { width: '100%', height: 130, backgroundColor: COLORS.surfaceAlt },
   info: { padding: 10 },
-  title: { fontSize: 13, fontWeight: '600', color: COLORS.textPrimary },
-  subtitle: { fontSize: 11, color: COLORS.textSecondary, marginTop: 4 },
+  title: { ...TYPE.label, color: COLORS.textPrimary },
+  subtitle: { ...TYPE.caption, color: COLORS.textSecondary, marginTop: 4 },
 });
 
 export default InspirationCard;

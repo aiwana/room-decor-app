@@ -3,7 +3,7 @@
  * THIET KE CUA TOI (thay man History cu): luoi 2 cot, mo lai de sua, xoa.
  *   GET /api/designs, DELETE /api/designs/{id}
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MockModeNotice } from '@/components/common/Notice';
 import { EmptyView, ErrorView, LoadingView } from '@/components/common/StateViews';
 import DesignCard from '@/components/design/DesignCard';
-import { COLORS, SPACING } from '@/constants/colors';
+import { COLORS, SPACING, TYPE } from '@/constants/colors';
 import { useDesigns } from '@/hooks/useDesigns';
 import { getErrorMessage } from '@/services/api-error';
 import { designApi } from '@/services/design-api';
@@ -19,8 +19,18 @@ import type { DesignDetail } from '@/types';
 
 export default function DesignsScreen() {
   const router = useRouter();
-  const { designs, loading, error, refresh } = useDesigns();
+  const { designs, loading, refreshing, error, refresh } = useDesigns();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Chi hien vong xoay khi nguoi dung tu keo xuong (khong hien moi lan quay lai tab).
+  // Truoc day refreshing luon = false nen keo xuong khong thay app dang tai.
+  const [pulling, setPulling] = useState(false);
+  const pullRefresh = (): void => {
+    setPulling(true);
+    refresh();
+  };
+  useEffect(() => {
+    if (!refreshing) setPulling(false);
+  }, [refreshing]);
 
   const openDesign = (design: DesignDetail): void => {
     router.push({ pathname: '/editor/[id]', params: { id: design.id } });
@@ -65,7 +75,7 @@ export default function DesignsScreen() {
         numColumns={2}
         columnWrapperStyle={styles.column}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={COLORS.accent} />}
+        refreshControl={<RefreshControl refreshing={pulling} onRefresh={pullRefresh} tintColor={COLORS.accent} />}
         renderItem={({ item }) => (
           <View style={styles.cell}>
             <DesignCard design={item} onPress={openDesign} onDelete={confirmDelete} />
@@ -90,8 +100,8 @@ export default function DesignsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
   header: { paddingHorizontal: SPACING.md, paddingTop: SPACING.sm, marginBottom: SPACING.md },
-  title: { fontSize: 26, fontWeight: 'bold', color: COLORS.textPrimary },
-  subtitle: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2 },
+  title: { ...TYPE.title, color: COLORS.textPrimary },
+  subtitle: { ...TYPE.label, fontWeight: '400', color: COLORS.textSecondary, marginTop: 2 },
   list: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.xl },
   column: { gap: 12 },
   cell: { flex: 1, marginBottom: 12, maxWidth: '50%' },

@@ -6,7 +6,7 @@ import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { COLORS, RADIUS, SPACING } from '@/constants/colors';
+import { COLORS, RADIUS, SPACING, TYPE } from '@/constants/colors';
 import type { IoniconName } from '@/types';
 
 interface ButtonProps {
@@ -32,7 +32,9 @@ const Button: React.FC<ButtonProps> = ({
   accessibilityLabel,
 }) => {
   const isDisabled = disabled || loading;
-  const textColor = variant === 'ghost' ? COLORS.accent : COLORS.textPrimary;
+  // Nen cam -> chu toi (chu trang tren cam chi ~3:1, kho doc ngoai nang)
+  const textColor =
+    variant === 'ghost' ? COLORS.accent : variant === 'primary' ? COLORS.onAccent : COLORS.textPrimary;
 
   return (
     <Pressable
@@ -81,7 +83,7 @@ const styles = StyleSheet.create({
   danger: { backgroundColor: COLORS.danger },
   disabled: { opacity: 0.4 },
   pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
-  text: { fontSize: 15, fontWeight: '700' },
+  text: { ...TYPE.body, fontWeight: '700' },
 });
 
 export default Button;

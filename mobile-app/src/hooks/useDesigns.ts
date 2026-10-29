@@ -14,6 +14,8 @@ import { useAsync } from './useAsync';
 export function useDesigns(): {
   designs: DesignDetail[];
   loading: boolean;
+  /** Dang tai lai trong khi da co du lieu cu (dung cho keo-de-lam-moi) */
+  refreshing: boolean;
   error: unknown;
   refresh: () => void;
 } {
@@ -26,5 +28,5 @@ export function useDesigns(): {
     }, [reload]),
   );
 
-  return { designs: data ?? [], loading: loading && !data, error, refresh: reload };
+  return { designs: data ?? [], loading: loading && !data, refreshing: loading && Boolean(data), error, refresh: reload };
 }

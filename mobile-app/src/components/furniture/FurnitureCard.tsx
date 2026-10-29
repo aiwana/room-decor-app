@@ -6,7 +6,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { COLORS, RADIUS } from '@/constants/colors';
+import { COLORS, RADIUS, TYPE } from '@/constants/colors';
 import { formatDimensions, getCategoryLabel } from '@/constants/furniture';
 import type { Furniture } from '@/types';
 import { formatPrice } from '@/utils';
@@ -56,11 +56,11 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
   image: { width: '100%', aspectRatio: 1 },
   info: { padding: 8 },
-  category: { fontSize: 10, color: COLORS.textSecondary, textTransform: 'uppercase', fontWeight: '600' },
-  title: { fontSize: 13, fontWeight: '600', color: COLORS.textPrimary, marginTop: 2, minHeight: 34 },
-  size: { fontSize: 11, color: COLORS.textSecondary, marginTop: 3 },
-  price: { fontSize: 13, fontWeight: '700', color: COLORS.accent, marginTop: 4 },
-  vendor: { fontSize: 9, color: COLORS.inactive, marginTop: 1 },
+  category: { ...TYPE.caption, color: COLORS.textSecondary },
+  title: { ...TYPE.label, color: COLORS.textPrimary, marginTop: 2, minHeight: 34 },
+  size: { ...TYPE.caption, color: COLORS.textSecondary, marginTop: 3 },
+  price: { ...TYPE.label, fontWeight: '700', color: COLORS.accent, marginTop: 4, fontVariant: ['tabular-nums'] },
+  vendor: { ...TYPE.caption, color: COLORS.inactive, marginTop: 1 },
 });
 
 export default FurnitureCard;

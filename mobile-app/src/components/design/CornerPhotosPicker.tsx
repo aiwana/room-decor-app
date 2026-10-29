@@ -8,7 +8,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 
-import { COLORS, RADIUS, SPACING } from '@/constants/colors';
+import { COLORS, RADIUS, SPACING, TOUCH_MIN } from '@/constants/colors';
 import type { PickedImage } from '@/hooks/useRoomImagePicker';
 
 /** Goi y cho tung anh, theo thu tu chup */
@@ -63,7 +63,7 @@ const CornerPhotosPicker: React.FC<CornerPhotosPickerProps> = ({
                   style={styles.removeBtn}
                   onPress={(): void => onRemove(i)}
                   accessibilityLabel={`Xoá ảnh góc ${i + 1}`}
-                  hitSlop={8}
+                  hitSlop={11}
                 >
                   <Ionicons name="close" size={14} color={COLORS.textPrimary} />
                 </Pressable>
@@ -81,8 +81,8 @@ const CornerPhotosPicker: React.FC<CornerPhotosPickerProps> = ({
           </Text>
           <View style={styles.row}>
             <Pressable style={styles.addBtn} onPress={onPickCamera} accessibilityRole="button">
-              <Ionicons name="camera-outline" size={16} color={COLORS.textPrimary} />
-              <Text style={styles.addBtnText}>Chụp</Text>
+              <Ionicons name="camera-outline" size={16} color={COLORS.onAccent} />
+              <Text style={[styles.addBtnText, styles.addBtnTextOnAccent]}>Chụp</Text>
             </Pressable>
             <Pressable style={[styles.addBtn, styles.addBtnAlt]} onPress={onPickGallery} accessibilityRole="button">
               <Ionicons name="images-outline" size={16} color={COLORS.textPrimary} />
@@ -125,11 +125,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 14,
-    height: 38,
+    height: TOUCH_MIN,
     borderRadius: RADIUS.md,
     backgroundColor: COLORS.greenFrom,
   },
   addBtnAlt: { backgroundColor: COLORS.slateFrom },
+  addBtnTextOnAccent: { color: COLORS.onAccent },
   addBtnText: { color: COLORS.textPrimary, fontWeight: '700', fontSize: 13 },
 });
 

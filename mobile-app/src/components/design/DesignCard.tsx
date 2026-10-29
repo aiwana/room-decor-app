@@ -9,7 +9,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 
-import { COLORS, RADIUS } from '@/constants/colors';
+import { COLORS, RADIUS, TYPE } from '@/constants/colors';
 import type { DesignDetail } from '@/types';
 import { formatDate } from '@/utils';
 
@@ -48,7 +48,13 @@ const DesignCard: React.FC<DesignCardProps> = ({ design, variant = 'grid', onPre
         <View style={styles.row}>
           <Text style={styles.date}>{formatDate(design.updatedAt)}</Text>
           {onDelete ? (
-            <Pressable hitSlop={8} onPress={(): void => onDelete(design)} accessibilityLabel="Xoá thiết kế">
+            <Pressable
+              style={styles.deleteBtn}
+              hitSlop={4}
+              onPress={(): void => onDelete(design)}
+              accessibilityRole="button"
+              accessibilityLabel={`Xoá thiết kế ${design.name}`}
+            >
               <Ionicons name="trash-outline" size={16} color={COLORS.textSecondary} />
             </Pressable>
           ) : null}
@@ -80,9 +86,11 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: 11, fontWeight: '700', color: COLORS.textPrimary },
   info: { padding: 10 },
-  title: { fontSize: 13, fontWeight: '600', color: COLORS.textPrimary },
+  // Vung bam 36 + hitSlop 4 moi phia = 44 (truoc day ~32, de bam nham mo thiet ke)
+  deleteBtn: { width: 36, height: 36, marginRight: -10, marginVertical: -10, alignItems: 'center', justifyContent: 'center' },
+  title: { ...TYPE.label, color: COLORS.textPrimary },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  date: { fontSize: 11, color: COLORS.textSecondary },
+  date: { ...TYPE.caption, color: COLORS.textSecondary },
 });
 
 export default DesignCard;
