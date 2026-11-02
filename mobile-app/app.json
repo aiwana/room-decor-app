@@ -5,11 +5,20 @@
     "version": "1.0.0",
     "scheme": "roomdecor",
     "userInterfaceStyle": "dark",
-    "platforms": ["ios", "android"],
-    "ios": { "bundleIdentifier": "com.roomdecor.app" },
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.roomdecor.app"
+    },
     "android": {
       "package": "com.roomdecor.app",
-      "backgroundColor": "#1A1A1A"
+      "backgroundColor": "#1A1A1A",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -21,7 +30,23 @@
           "cameraPermission": "RoomDecor cần camera để chụp ảnh căn phòng."
         }
       ],
-      "expo-camera"
-    ]
+      "expo-camera",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "c70f1793-d603-482f-bf86-f105467ba2f8"
+      }
+    }
   }
 }

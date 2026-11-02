@@ -18,7 +18,8 @@ import { toApiError } from './api-error';
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: API_TIMEOUT,
-  headers: { Accept: 'application/json' },
+  // ngrok-skip-browser-warning: backend public qua ngrok (ban mien phi) se khong chen trang canh bao vao response
+  headers: { Accept: 'application/json', 'ngrok-skip-browser-warning': 'true' },
 });
 
 /* ------------------------- Token dang nhap ------------------------- */

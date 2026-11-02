@@ -51,5 +51,19 @@ services:
       postgres:
         condition: service_healthy
 
+  # Public HTTPS address for the APK (ngrok static domain). Only starts with:  --profile public
+  # Needs NGROK_AUTHTOKEN and NGROK_DOMAIN in backend/.env (see docs/06-dong-goi-docker-jenkins-apk.md)
+  tunnel:
+    image: ngrok/ngrok:latest
+    container_name: roomdecor-tunnel
+    profiles: ["public"]
+    restart: unless-stopped
+    command: ["http", "backend:8080", "--url=https://${NGROK_DOMAIN:-set-NGROK_DOMAIN-in-env}"]
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    depends_on:
+      backend:
+        condition: service_healthy
+
 volumes:
   pgdata:

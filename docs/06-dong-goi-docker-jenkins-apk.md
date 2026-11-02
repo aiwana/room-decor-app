@@ -116,6 +116,37 @@ eas build -p android --profile preview
 
 Build xong, EAS đưa link tải file `.apk`. Chép file đó vào điện thoại để cài, hoặc đính kèm vào GitHub Releases.
 
+### Địa chỉ công khai bằng ngrok (APK dùng được ở mọi mạng)
+
+Người dùng không phải nhập IP hay cấu hình gì. APK gọi một địa chỉ HTTPS cố định, ngrok chuyển địa chỉ đó về backend đang chạy trên laptop.
+
+1. Tạo tài khoản ở https://ngrok.com. Vào **Domains** để nhận 1 tên miền tĩnh miễn phí (ví dụ `abc-xyz.ngrok-free.app`). Vào **Your Authtoken** để copy token. Token là **bí mật**, không gửi cho ai, không commit.
+2. Thêm vào `backend/.env`:
+   ```
+   NGROK_AUTHTOKEN=<token>
+   NGROK_DOMAIN=abc-xyz.ngrok-free.app
+   STORAGE_BASE_URL=https://abc-xyz.ngrok-free.app/files
+   ```
+3. Bật backend cùng đường hầm:
+   ```powershell
+   cd backend
+   docker compose -f docker-compose.existing-db.yml --profile public up -d
+   docker compose -f docker-compose.existing-db.yml --profile public logs --tail 20 tunnel
+   curl.exe https://abc-xyz.ngrok-free.app/actuator/health      # {"status":"UP"}
+   ```
+   (Máy mới thì bỏ `-f docker-compose.existing-db.yml`.)
+4. Trong `mobile-app/eas.json`, profile `production`, đặt `"EXPO_PUBLIC_API_URL": "https://abc-xyz.ngrok-free.app/api"`, rồi build:
+   ```powershell
+   cd mobile-app
+   eas build -p android --profile production
+   ```
+   Bản này không cần cho phép http, cũng không phụ thuộc Wi-Fi.
+
+Lưu ý:
+- App chỉ chạy được khi laptop đang bật và 2 container `roomdecor-api`, `roomdecor-tunnel` đang chạy. Cả hai có `restart: unless-stopped`, nên tự bật lại khi mở Docker Desktop.
+- App đã gửi header `ngrok-skip-browser-warning`, và WebView 3D dùng User-Agent riêng, nên trang cảnh báo của ngrok bản miễn phí không chèn vào được.
+- Muốn chạy 24/7 thì chuyển sang VPS: chạy `docker-compose.yml` trên VPS, đổi `EXPO_PUBLIC_API_URL` rồi build lại APK một lần.
+
 ### Phát hành qua GitHub Releases
 
-Người tải APK không ở chung Wi-Fi với máy chạy backend, nên backend phải có địa chỉ **HTTPS công khai** (ví dụ tunnel có tên miền cố định như ngrok hoặc Cloudflare Tunnel, hoặc thuê VPS chạy `docker compose`). Có địa chỉ rồi thì điền vào profile `production`, build `--profile production`, rồi tạo Release trên GitHub và đính kèm file `.apk`.
+Có địa chỉ công khai rồi (ngrok hoặc VPS) thì build profile `production`, sau đó tạo Release trên GitHub và đính kèm file `.apk`.

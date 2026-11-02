@@ -21,7 +21,7 @@
       },
       "env": {
         "EXPO_PUBLIC_USE_MOCK": "false",
-        "EXPO_PUBLIC_API_URL": "https://DOI-THANH-DIA-CHI-HTTPS-CUA-BACKEND/api"
+        "EXPO_PUBLIC_API_URL": "https://cytoplast-junction-washed.ngrok-free.dev/api"
       }
     }
   }

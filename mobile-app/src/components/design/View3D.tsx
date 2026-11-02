@@ -120,7 +120,15 @@ const View3D: React.FC<View3DProps> = (props) => {
 
   return (
     <View style={styles.container}>
-      <WebView originWhitelist={['*']} source={{ html, baseUrl }} style={styles.webview} javaScriptEnabled />
+      <WebView
+        originWhitelist={['*']}
+        source={{ html, baseUrl }}
+        style={styles.webview}
+        javaScriptEnabled
+        // User-Agent rieng (khong giong trinh duyet): ngrok ban mien phi khong chen trang canh bao
+        // khi WebView tai texture tu backend public
+        userAgent="RoomDecorApp/1.0"
+      />
     </View>
   );
 };
