@@ -1,0 +1,32 @@
+# RoomDecor Spring Boot backend in Docker, using the EXISTING container room-decor-postgres
+# (database "roomdecor", already migrated to V8 - Flyway only applies new migrations, data is kept).
+# Needs the Docker network room-decor-net with room-decor-postgres attached (created 2026-10-15).
+# Run from the backend folder:
+#   docker compose -f docker-compose.existing-db.yml up -d --build
+#   docker compose -f docker-compose.existing-db.yml logs -f backend
+#   docker compose -f docker-compose.existing-db.yml down      (removes only the backend container)
+# Stop "mvnw spring-boot:run" first: both use port 8080.
+
+name: roomdecor-existing-db
+
+services:
+  backend:
+    build: .
+    image: roomdecor-backend:local
+    container_name: roomdecor-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # room-decor-postgres listens on 5432 inside the network (5433 is only the host port)
+      DB_URL: jdbc:postgresql://room-decor-postgres:5432/roomdecor
+      UPLOAD_DIR: /app/uploads
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./uploads:/app/uploads
+    networks:
+      - room-decor-net
+
+networks:
+  room-decor-net:
+    external: true

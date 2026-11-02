@@ -14,6 +14,7 @@ Xem và gọi thử toàn bộ API trên trình duyệt: **http://localhost:8080
 | POST | `/api/auth/login` | Không | | Đăng nhập, nhận JWT |
 | GET | `/api/users/me` | Có | USER, ADMIN | Thông tin tài khoản đang đăng nhập |
 | GET | `/api/admin/users` | Có | ADMIN | Danh sách tất cả tài khoản |
+| POST/PUT/DELETE | `/api/admin/furniture` | Có | ADMIN | Quản lý danh mục nội thất (chi tiết ở [api.md](api.md#nội-thất)) |
 
 ## 2. Xác thực bằng JWT
 

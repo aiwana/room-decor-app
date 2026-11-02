@@ -45,3 +45,5 @@ uploads/
 
 # Generated
 *.tsbuildinfo
+
+graphify-out/

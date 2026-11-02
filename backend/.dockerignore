@@ -1,0 +1,14 @@
+# Keep secrets, build output and local data out of the Docker build context
+.env
+.env.*
+!.env.example
+target/
+uploads/
+.mvn/
+mvnw
+mvnw.cmd
+*.log
+.idea/
+.vscode/
+README.md
+docker-compose*.yml

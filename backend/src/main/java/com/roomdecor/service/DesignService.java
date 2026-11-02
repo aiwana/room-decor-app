@@ -2,10 +2,10 @@ package com.roomdecor.service;
 
 import com.roomdecor.dto.design.*;
 import com.roomdecor.entity.*;
-import com.roomdecor.exception.BadRequestException;
 import com.roomdecor.exception.ResourceNotFoundException;
 import com.roomdecor.mapper.DesignMapper;
 import com.roomdecor.repository.*;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,7 +40,7 @@ public class DesignService {
         Design design = designRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Design not found"));
         if (!design.getUser().getId().equals(userId)) {
-            throw new BadRequestException("Access denied to this design");
+            throw new AccessDeniedException("Access denied to this design");
         }
         return DesignMapper.toDto(design);
     }
@@ -50,6 +50,10 @@ public class DesignService {
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         RoomImage roomImage = roomImageRepository.findById(request.roomImageId())
             .orElseThrow(() -> new ResourceNotFoundException("Room image not found"));
+        // A design may only use the caller's own room photo
+        if (roomImage.getUser() == null || !roomImage.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("Access denied to this room image");
+        }
 
         Design design = Design.builder()
             .user(user)
@@ -68,7 +72,7 @@ public class DesignService {
         Design design = designRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Design not found"));
         if (!design.getUser().getId().equals(userId)) {
-            throw new BadRequestException("Access denied to this design");
+            throw new AccessDeniedException("Access denied to this design");
         }
 
         if (request.name() != null && !request.name().isBlank()) {
@@ -111,7 +115,7 @@ public class DesignService {
         Design design = designRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Design not found"));
         if (!design.getUser().getId().equals(userId)) {
-            throw new BadRequestException("Access denied to this design");
+            throw new AccessDeniedException("Access denied to this design");
         }
         designRepository.delete(design);
     }

@@ -18,14 +18,33 @@ Gốc: `http://localhost:8080` (máy ảo Android: `http://10.0.2.2:8080`). Gọ
 
 ## Nội thất
 
-| Phương thức | Đường dẫn | Mô tả |
-|---|---|---|
-| GET | `/api/furniture?category=sofa` | Danh sách (lọc theo danh mục, không bắt buộc) |
-| GET | `/api/furniture/search?q=ghe` | Tìm theo tên |
-| GET | `/api/furniture/{id}` | Chi tiết |
+| Phương thức | Đường dẫn | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/api/furniture?category=sofa` | USER, ADMIN | Danh sách (lọc theo danh mục, không bắt buộc) |
+| GET | `/api/furniture/search?q=ghe` | USER, ADMIN | Tìm theo tên |
+| GET | `/api/furniture/{id}` | USER, ADMIN | Chi tiết |
+| POST | `/api/admin/furniture` | ADMIN | Thêm đồ vào danh mục, trả 201 + `FurnitureDto` |
+| PUT | `/api/admin/furniture/{id}` | ADMIN | Sửa đồ (**thay toàn bộ** các trường, trường bỏ trống thành rỗng/mặc định) |
+| DELETE | `/api/admin/furniture/{id}` | ADMIN | Xoá (204). Đồ đang có trong thiết kế đã lưu thì trả **409** |
 
-`FurnitureDto`: `{ id, name, category, width, height, depth, modelUrl, thumbnailUrl }`, kích thước tính bằng **cm**.
-Bảng `furniture` hiện chưa có dữ liệu mẫu (app dùng nội thất mẫu của riêng app).
+`FurnitureDto`: `{ id, name, category, width, height, depth, modelUrl, thumbnailUrl, vendorId, vendorName, price, currency, style, material, stockStatus }`, kích thước tính bằng **cm**.
+Dữ liệu mẫu có sẵn từ Flyway V4, V5 (đã sửa cao/sâu ở V8).
+
+Body `POST`/`PUT /api/admin/furniture` (bắt buộc `name`, `category`, `width`, `height`, `depth` > 0):
+
+```json
+{
+  "name": "Ghế đôn tròn", "category": "chair",
+  "width": 40, "height": 45, "depth": 40,
+  "modelUrl": null, "thumbnailUrl": null,
+  "price": 500000, "currency": "VND", "style": "Hiện đại", "material": "Gỗ",
+  "stockStatus": "in_stock"
+}
+```
+
+- `stockStatus`: `in_stock` (mặc định), `out_of_stock` hoặc `preorder`. `currency` mặc định `VND`.
+- Nhà cung cấp (`vendor`) không sửa ở đây; sửa đồ thì giữ nguyên nhà cung cấp cũ.
+- Lỗi: 400 (dữ liệu sai, có `errors` theo từng trường), 401 (thiếu token), 403 (không phải ADMIN), 404 (không có đồ), 409 (đồ đang được dùng).
 
 ## Ảnh phòng
 
@@ -145,6 +164,8 @@ Tọa độ tính bằng **mét**, gốc `(0,0)` ở góc trên trái khi nhìn 
 | POST | `/api/designs` | Tạo: `{ "name": "Phòng khách", "roomImageId": "..." }` |
 | PUT | `/api/designs/{id}` | Đổi tên và/hoặc **thay toàn bộ** danh sách nội thất |
 | DELETE | `/api/designs/{id}` | Xoá (204) |
+
+Chỉ chủ thiết kế mới đọc, sửa, xoá được: thiết kế của người khác trả **403**. Khi tạo thiết kế, `roomImageId` phải là ảnh phòng của chính mình (ảnh của người khác cũng trả 403).
 
 Body `PUT /api/designs/{id}` (bỏ `name` để giữ tên cũ, bỏ `placements` để giữ nội thất cũ):
 

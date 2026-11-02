@@ -1,0 +1,28 @@
+{
+  "cli": {
+    "version": ">= 14.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_USE_MOCK": "false",
+        "EXPO_PUBLIC_API_URL": "http://172.17.144.106:8080/api"
+      }
+    },
+    "production": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_USE_MOCK": "false",
+        "EXPO_PUBLIC_API_URL": "https://DOI-THANH-DIA-CHI-HTTPS-CUA-BACKEND/api"
+      }
+    }
+  }
+}
