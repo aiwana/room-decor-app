@@ -50,6 +50,8 @@ public class SecurityConfig {
                 .requestMatchers("/error").permitAll()
                 // Liveness check used by Docker HEALTHCHECK and Jenkins (returns only {"status":"UP"})
                 .requestMatchers("/actuator/health").permitAll()
+                // Metrics for Prometheus (counters/timings only, no user data or secrets)
+                .requestMatchers("/actuator/prometheus").permitAll()
                 .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()

@@ -16,6 +16,7 @@ RoomDecor là app di động giúp người dùng chụp ảnh căn phòng, đ�
 4. [04-chay-mobile.md](04-chay-mobile.md): chạy app trên máy ảo Android hoặc điện thoại, chế độ mock và chế độ thật.
 5. [05-tinh-nang-quet-phong-ai-3d.md](05-tinh-nang-quet-phong-ai-3d.md): cập nhật mới (quét nhiều ảnh, sửa hình phòng, AI gợi ý bố trí, 3D): cần làm gì sau khi pull, chạy trên điện thoại thật, lỗi hay gặp.
 6. [06-dong-goi-docker-jenkins-apk.md](06-dong-goi-docker-jenkins-apk.md): chạy backend bằng Docker, Jenkins cho nhánh master, build APK.
+7. [07-jenkins-sonar-giam-sat.md](07-jenkins-sonar-giam-sat.md): Jenkinsfile (CI/CD + SonarQube + deploy local), giám sát bằng Prometheus và Grafana.
 
 Tài liệu API:
 
@@ -51,6 +52,8 @@ npx expo start -c                # bấm "a" để mở máy ảo Android
 | `5433` | PostgreSQL (`127.0.0.1:5433` trên máy, `5432` bên trong container) |
 | `8080` | Backend Spring Boot (`/api`, Swagger `/swagger-ui.html`, ảnh `/files`, health `/actuator/health`) |
 | `8081` | Metro bundler của Expo |
+| `9090` | Prometheus (`127.0.0.1`, chỉ máy mình mở được) |
+| `3030` | Grafana (`127.0.0.1`, dashboard RoomDecor Backend) |
 
 Máy ảo Android gọi máy tính qua `10.0.2.2`, nên app dùng `http://10.0.2.2:8080/api`.
 

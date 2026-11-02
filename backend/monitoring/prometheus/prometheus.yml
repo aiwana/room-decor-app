@@ -1,0 +1,21 @@
+# Prometheus for RoomDecor (local only). Baked into the image by monitoring/prometheus/Dockerfile.
+global:
+  scrape_interval: 15s      # read metrics every 15 seconds
+  evaluation_interval: 15s  # check alert rules every 15 seconds
+
+rule_files:
+  - /etc/prometheus/alert-rules.yml
+
+scrape_configs:
+  # Spring Boot backend: container roomdecor-api on Docker network room-decor-net
+  - job_name: roomdecor-backend
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["roomdecor-api:8080"]
+        labels:
+          env: local
+
+  # Prometheus watching itself
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

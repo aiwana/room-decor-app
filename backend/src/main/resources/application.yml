@@ -22,15 +22,25 @@ spring:
 server:
   port: 8080
 
-# Health check for Docker/Jenkins: only GET /actuator/health is exposed, without details
+# Actuator: only 2 endpoints are exposed, both without secrets
+#   /actuator/health      -> {"status":"UP"} for Docker HEALTHCHECK and Jenkins
+#   /actuator/prometheus  -> metrics (JVM, HTTP requests, DB pool) scraped by Prometheus, shown in Grafana
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus
   endpoint:
     health:
       show-details: never
+  metrics:
+    tags:
+      # Every metric gets application="roomdecor-backend" so Grafana can filter by app
+      application: roomdecor-backend
+    distribution:
+      # Histogram buckets for HTTP requests, so Grafana can compute p95 latency
+      percentiles-histogram:
+        http.server.requests: true
 
 app:
   jwt:

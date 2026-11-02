@@ -6,6 +6,8 @@
 #   docker compose -f docker-compose.existing-db.yml logs -f backend
 #   docker compose -f docker-compose.existing-db.yml down      (removes only the backend container)
 # Stop "mvnw spring-boot:run" first: both use port 8080.
+# Jenkins (Jenkinsfile, stage "Deploy local") runs this same file with BACKEND_ENV_FILE (Jenkins secret file)
+# and UPLOADS_DIR (host folder) set; by hand both keep their defaults (.env and ./uploads).
 
 name: roomdecor-existing-db
 
@@ -15,7 +17,7 @@ services:
     image: roomdecor-backend:local
     container_name: roomdecor-api
     restart: unless-stopped
-    env_file: .env
+    env_file: ${BACKEND_ENV_FILE:-.env}
     environment:
       # room-decor-postgres listens on 5432 inside the network (5433 is only the host port)
       DB_URL: jdbc:postgresql://room-decor-postgres:5432/roomdecor
@@ -23,7 +25,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./uploads:/app/uploads
+      - ${UPLOADS_DIR:-./uploads}:/app/uploads
     networks:
       - room-decor-net
 

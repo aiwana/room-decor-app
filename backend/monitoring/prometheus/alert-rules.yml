@@ -1,0 +1,31 @@
+# Alert rules, shown in Prometheus at Alerts (no Alertmanager: alerts are only displayed, not sent).
+groups:
+  - name: roomdecor-backend
+    rules:
+      - alert: RoomDecorApiDown
+        expr: up{job="roomdecor-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend RoomDecor khong tra loi Prometheus qua 1 phut"
+
+      - alert: RoomDecorHigh5xxRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{application="roomdecor-backend",status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count{application="roomdecor-backend"}[5m])), 0.001) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Hon 5% request tra loi 5xx trong 5 phut"
+
+      - alert: RoomDecorHeapHigh
+        expr: |
+          sum(jvm_memory_used_bytes{application="roomdecor-backend",area="heap"})
+            / sum(jvm_memory_max_bytes{application="roomdecor-backend",area="heap"} > 0) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Bo nho heap JVM dung tren 90% trong 5 phut"

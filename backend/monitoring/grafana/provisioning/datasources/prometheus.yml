@@ -1,0 +1,10 @@
+# Grafana reads Prometheus at startup, no clicking needed
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://roomdecor-prometheus:9090
+    isDefault: true
+    editable: false
