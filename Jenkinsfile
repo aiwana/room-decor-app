@@ -218,6 +218,11 @@ pipeline {
                     done
                     echo "$R" | grep -q '"value":\\[[0-9.]*,"1"\\]'
                     echo "--- Grafana health ---"
+                    # Grafana needs ~10-30 s after (re)start before it answers
+                    for i in $(seq 1 20); do
+                      docker exec roomdecor-grafana wget -qO- http://127.0.0.1:3000/api/health && break
+                      echo "Grafana not ready yet, waiting..."; sleep 3
+                    done
                     docker exec roomdecor-grafana wget -qO- http://127.0.0.1:3000/api/health; echo
                     echo "Deploy OK: API http://localhost:8080  Prometheus http://localhost:9090  Grafana http://localhost:3030"
                 '''
