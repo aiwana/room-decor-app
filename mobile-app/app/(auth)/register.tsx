@@ -8,6 +8,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } fro
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
+import AuthBrand from '@/components/common/AuthBrand';
 import Button from '@/components/common/Button';
 import FormField from '@/components/common/FormField';
 import { MockModeNotice } from '@/components/common/Notice';
@@ -58,6 +59,7 @@ export default function RegisterScreen() {
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <AuthBrand compact />
         <Text style={styles.title}>Tạo tài khoản</Text>
         <Text style={styles.subtitle}>Lưu thiết kế căn phòng và xem lại bất cứ lúc nào.</Text>
 
@@ -68,7 +70,7 @@ export default function RegisterScreen() {
 
         {formError ? (
           <View style={styles.formError}>
-            <Ionicons name="alert-circle" size={18} color={COLORS.danger} />
+            <Ionicons name="alert-circle" size={18} color={COLORS.dangerText} />
             <Text style={styles.formErrorText}>{formError}</Text>
           </View>
         ) : null}

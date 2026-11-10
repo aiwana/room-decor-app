@@ -83,6 +83,9 @@ public class AiService {
      */
     public ScanRoomResponse scanRoom(ScanRoomRequest request, UUID userId) {
         RoomImage image = loadOwnedImage(request.roomImageId(), userId);
+        if (image.isBlank()) {
+            throw new BadRequestException("This room was created without a photo, so it cannot be scanned. Edit its walls instead");
+        }
 
         // Extra photos: drop duplicates and the main photo itself, keep the user's order
         List<UUID> extraIds = request.extraImageIds() == null ? List.of()
@@ -94,7 +97,11 @@ public class AiService {
         List<RoomImage> photos = new ArrayList<>();
         photos.add(image);
         for (UUID id : extraIds) {
-            photos.add(loadOwnedImage(id, userId));
+            RoomImage extra = loadOwnedImage(id, userId);
+            if (extra.isBlank()) {
+                throw new BadRequestException("Extra images must be room photos");
+            }
+            photos.add(extra);
         }
 
         // Read the local uploads and send them inline so localhost/LAN URLs do not need to be public.
@@ -109,9 +116,11 @@ public class AiService {
             inputs.add(new RoomVisionClient.ImageInput(photo.getUrl(), bytes, storageService.imageMimeType(photo.getUrl())));
         }
 
-        RoomVisionClient.RoomAnalysisResult result = FloorPlanGeometry.normalize(
-            visionClient.analyze(inputs, new RoomVisionClient.ScanHints(request.referenceLengthMeters()))
-        );
+        RoomVisionClient.ScanHints hints = new RoomVisionClient.ScanHints(request.referenceLengthMeters(),
+            request.roomLengthMeters(), request.roomWidthMeters(), request.ceilingHeightMeters());
+        // Clean the raw answer, then square it up and stretch it to the user's measurements
+        RoomVisionClient.RoomAnalysisResult result = FloorPlanGeometry.normalize(ScanCorrection.apply(
+            FloorPlanGeometry.normalize(visionClient.analyze(inputs, hints)), hints));
 
         // Delete existing floor plan for this image (re-scan replaces it).
         // Flush so the DELETE runs before the INSERT below (room_image_id is UNIQUE).

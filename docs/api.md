@@ -75,13 +75,19 @@ Kết quả upload:
 {
   "roomImageId": "619faa53-...",
   "extraImageIds": ["a1b2...", "c3d4...", "e5f6..."],
-  "referenceLengthMeters": 3.2
+  "roomLengthMeters": 5.1,
+  "roomWidthMeters": 3.6,
+  "ceilingHeightMeters": 2.7
 }
 ```
 
 - `roomImageId` (bắt buộc): ảnh chính, mặt bằng gắn với ảnh này.
 - `extraImageIds` (không bắt buộc, tối đa 5): ảnh phụ của **cùng căn phòng**, ví dụ mỗi góc 1 ảnh, theo thứ tự đi quanh phòng. Tất cả ảnh phải là của người đang đăng nhập; tổng dung lượng tối đa 14 MB.
-- `referenceLengthMeters` (không bắt buộc, 0,5 đến 30): chiều dài thật của **bức tường đối diện máy ảnh trong ảnh chính**, để AI căn tỷ lệ.
+- `roomLengthMeters`, `roomWidthMeters` (không bắt buộc, 0,5 đến 30): chiều dài (cạnh dài) và chiều rộng (cạnh ngắn) phòng do người dùng đo. Backend **tự kéo giãn mặt bằng** cho khớp: số lớn hơn ứng với cạnh dài hơn của mặt bằng, nên không cần biết hướng chụp. Chỉ gửi 1 trong 2 số thì cả phòng được phóng to/thu nhỏ đều theo số đó.
+- `ceilingHeightMeters` (không bắt buộc, 1,8 đến 6): chiều cao trần đo được, dùng thay cho số AI đoán.
+- `referenceLengthMeters` (không bắt buộc, 0,5 đến 30, dành cho app bản cũ): chiều dài thật của **bức tường đối diện máy ảnh trong ảnh chính**, chỉ được gửi cho AI để căn tỷ lệ.
+
+Sau khi AI trả lời, backend tự làm gọn mặt bằng (`ScanCorrection`): xoay lại nếu cả phòng bị lệch vài độ, tường lệch dưới 10° thành thẳng/vuông góc, gộp đoạn tường thẳng hàng, bỏ đoạn tường ngắn hơn 20 cm, làm tròn góc phòng theo lưới 5 cm, đưa cửa ra vào / cửa sổ về bức tường gần nhất. Tường xiên rõ ràng (ví dụ góc vát 45°) được giữ nguyên.
 
 Kết quả:
 
@@ -97,7 +103,7 @@ Kết quả:
     "walls": [ { "x1": 0, "y1": 0, "x2": 4, "y2": 0 }, { "x1": 4, "y1": 0, "x2": 4, "y2": 4 }, "..." ],
     "openings": [ { "type": "door", "x1": 0.5, "y1": 4, "x2": 1.35, "y2": 4 } ],
     "pixelsPerMeter": 100,
-    "description": "Phòng mẫu hình chữ nhật 4.0 m x 4.0 m, có 1 cửa ra vào, quét từ 1 ảnh (chưa cấu hình khoá AI).",
+    "description": "Phòng mẫu hình chữ nhật, có 1 cửa ra vào, quét từ 1 ảnh (chưa cấu hình khoá AI).",
     "createdAt": "...",
     "updatedAt": "..."
   },
@@ -152,6 +158,9 @@ Kết quả:
 | GET | `/api/floor-plans/{id}` | Mặt bằng theo id |
 | GET | `/api/floor-plans/by-room-image/{roomImageId}` | Mặt bằng của một ảnh (404 nếu ảnh chưa quét) |
 | PUT | `/api/floor-plans/{id}` | Sửa: `{ roomWidth?, roomDepth?, ceilingHeight?, walls?, openings?, pixelsPerMeter? }`, trường nào bỏ trống thì giữ nguyên |
+| POST | `/api/floor-plans/blank` | Phòng trống / phòng mẫu, **không cần ảnh**: `{ roomWidth, roomDepth, ceilingHeight?, walls?, openings?, description? }` (mét). Trả 201 + mặt bằng; `roomImageId` trỏ tới một "ảnh" loại `blank` (không có file) để tạo thiết kế như bình thường. Không gửi `walls` thì phòng là hình chữ nhật |
+
+Mặt bằng và ảnh phòng có thêm trường `source`: `photo` (quét từ ảnh) hoặc `blank` (tự tạo). Gọi `POST /api/ai/scan-room` với ảnh `blank` trả 400 vì không có ảnh để quét; `POST /api/ai/suggest-layout` vẫn dùng được.
 
 Tọa độ tính bằng **mét**, gốc `(0,0)` ở góc trên trái khi nhìn từ trên xuống; `x` theo chiều rộng, `y` theo chiều sâu.
 
@@ -161,17 +170,20 @@ Tọa độ tính bằng **mét**, gốc `(0,0)` ở góc trên trái khi nhìn 
 |---|---|---|
 | GET | `/api/designs` | Thiết kế của tôi |
 | GET | `/api/designs/{id}` | Chi tiết, kèm `placements` |
-| POST | `/api/designs` | Tạo: `{ "name": "Phòng khách", "roomImageId": "..." }` |
-| PUT | `/api/designs/{id}` | Đổi tên và/hoặc **thay toàn bộ** danh sách nội thất |
+| POST | `/api/designs` | Tạo: `{ "name": "Phòng khách", "roomImageId": "...", "roomType": "living" }` (`roomType` không bắt buộc, mặc định `other`) |
+| PUT | `/api/designs/{id}` | Đổi tên, đổi loại phòng và/hoặc **thay toàn bộ** danh sách nội thất |
 | DELETE | `/api/designs/{id}` | Xoá (204) |
 
 Chỉ chủ thiết kế mới đọc, sửa, xoá được: thiết kế của người khác trả **403**. Khi tạo thiết kế, `roomImageId` phải là ảnh phòng của chính mình (ảnh của người khác cũng trả 403).
 
-Body `PUT /api/designs/{id}` (bỏ `name` để giữ tên cũ, bỏ `placements` để giữ nội thất cũ):
+`roomType` (từ V10) nhận một trong các giá trị `living`, `bedroom`, `kitchen`, `dining`, `office`, `kids`, `bathroom`, `other`. Giá trị khác trả **400**. Thiết kế cũ có sẵn `other`. App bản 1.0 không gửi trường này nên vẫn chạy bình thường.
+
+Body `PUT /api/designs/{id}` (bỏ `name` để giữ tên cũ, bỏ `roomType` để giữ loại cũ, bỏ `placements` để giữ nội thất cũ):
 
 ```json
 {
   "name": "Phòng khách mới",
+  "roomType": "living",
   "placements": [
     { "furnitureId": "882ce1a7-...", "x": 0.5, "y": 0.4, "rotation": 90, "scale": 1 }
   ]

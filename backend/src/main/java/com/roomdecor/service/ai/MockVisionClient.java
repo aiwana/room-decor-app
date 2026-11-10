@@ -15,7 +15,8 @@ public class MockVisionClient implements RoomVisionClient {
 
     @Override
     public RoomAnalysisResult analyze(List<ImageInput> images, ScanHints hints) {
-        // Default rectangular room: 4m x 4m, 2.7m ceiling (or the user's measured width)
+        // Default rectangular room: 4m x 4m, 2.7m ceiling. ScanCorrection later stretches it to the
+        // length/width the user measured; older apps only send the wall facing the camera.
         double w = hints != null && hints.referenceLengthMeters() != null ? hints.referenceLengthMeters() : 4.0;
         double d = 4.0;
         return new RoomAnalysisResult(
@@ -28,8 +29,8 @@ public class MockVisionClient implements RoomVisionClient {
             ),
             List.of(new Opening(Opening.DOOR, 0.5, d, 1.35, d)),
             String.format(Locale.ROOT,
-                "Phòng mẫu hình chữ nhật %.1f m x 4.0 m, có 1 cửa ra vào, quét từ %d ảnh (chưa cấu hình khoá AI).",
-                w, images.size())
+                "Phòng mẫu hình chữ nhật, có 1 cửa ra vào, quét từ %d ảnh (chưa cấu hình khoá AI).",
+                images.size())
         );
     }
 }

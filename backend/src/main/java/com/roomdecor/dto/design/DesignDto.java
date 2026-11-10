@@ -13,5 +13,7 @@ public record DesignDto(
     String skirtingMaterial,
     List<PlacementDto> placements,
     Instant createdAt,
-    Instant updatedAt
+    Instant updatedAt,
+    /** living, bedroom, kitchen, dining, office, kids, bathroom, other */
+    String roomType
 ) {}

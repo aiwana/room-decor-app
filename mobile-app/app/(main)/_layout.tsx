@@ -10,13 +10,14 @@
  *   furniture/index   -> Danh muc noi that
  *   furniture/[id]    -> Chi tiet noi that
  *   settings          -> Cai dat & ket noi may chu
+ *   room-shape        -> Sua phong (goc, tuong, cua, tran)
  */
 import { StyleSheet, View } from 'react-native';
 import { Redirect, Stack } from 'expo-router';
 
 import Button from '@/components/common/Button';
 import { ErrorView, LoadingView } from '@/components/common/StateViews';
-import { COLORS, SPACING } from '@/constants/colors';
+import { COLORS, FONT, SPACING } from '@/constants/colors';
 import { useAuthStore } from '@/store/auth-store';
 
 export default function MainLayout() {
@@ -44,6 +45,7 @@ export default function MainLayout() {
         headerShown: false,
         headerTintColor: COLORS.textPrimary,
         headerStyle: { backgroundColor: COLORS.background },
+        headerTitleStyle: { fontFamily: FONT.semibold, fontSize: 17 },
         headerBackTitle: 'Quay lại',
         contentStyle: { backgroundColor: COLORS.background },
       }}
@@ -53,6 +55,11 @@ export default function MainLayout() {
       <Stack.Screen name="furniture/index" options={{ headerShown: true, title: 'Danh mục nội thất' }} />
       <Stack.Screen name="furniture/[id]" options={{ headerShown: true, title: 'Chi tiết nội thất' }} />
       <Stack.Screen name="settings" options={{ headerShown: true, title: 'Cài đặt' }} />
+      {/* Sua phong: man hinh rieng truot tu duoi len (khong dung Modal, xem room-shape.tsx) */}
+      <Stack.Screen
+        name="room-shape"
+        options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false }}
+      />
     </Stack>
   );
 }

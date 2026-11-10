@@ -1,96 +1,160 @@
 /**
  * src/components/design/DesignCard.tsx
- * The 1 thiet ke (anh phong + ten + so mon do + ngay).
- * variant 'grid'    -> man "Thiet ke cua toi" (2 cot, co nut xoa)
+ * The 1 thiet ke: anh dai dien (anh 3D / mat bang thu nho / anh chup), ten, loai phong,
+ * dien tich, so mon, tong bao gia uoc tinh, "sửa 2 giờ trước".
+ * variant 'grid'    -> man "Của tôi", 2 cot
+ * variant 'list'    -> man "Của tôi", dang danh sach
  * variant 'compact' -> Home "Thiet ke gan day" (cuon ngang)
+ * Nhan giu (hoac nut ...) -> onMore: mo bang thao tac (doi ten, nhan ban, xoa...).
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 
-import { COLORS, RADIUS, TYPE } from '@/constants/colors';
+import DesignThumb from '@/components/design/DesignThumb';
+import { COLORS, FONT, RADIUS, TYPE } from '@/constants/colors';
+import { roomTypeInfo } from '@/constants/room-types';
 import type { DesignDetail } from '@/types';
-import { formatDate } from '@/utils';
+import { formatRelative, formatShortPrice } from '@/utils';
+import { haptic } from '@/utils/haptics';
 
 interface DesignCardProps {
   design: DesignDetail;
-  variant?: 'grid' | 'compact';
+  variant?: 'grid' | 'list' | 'compact';
   onPress: (design: DesignDetail) => void;
-  onDelete?: (design: DesignDetail) => void;
+  /** Mo bang thao tac (nhan giu the hoac bam nut ...) */
+  onMore?: (design: DesignDetail) => void;
 }
 
-const DesignCard: React.FC<DesignCardProps> = ({ design, variant = 'grid', onPress, onDelete }) => {
-  const imageStyle = variant === 'compact' ? styles.imageCompact : styles.imageGrid;
-  return (
-    <Pressable
-      onPress={(): void => onPress(design)}
-      style={({ pressed }) => [styles.card, variant === 'compact' ? styles.compact : styles.grid, pressed && styles.pressed]}
-      accessibilityRole="button"
-      accessibilityLabel={design.name}
-    >
-      {design.roomImageUri ? (
-        <Image source={{ uri: design.roomImageUri }} style={imageStyle} contentFit="cover" transition={200} />
-      ) : (
-        // Thiet ke tao tren may khac -> may nay khong co anh phong
-        <View style={[imageStyle, styles.noImage]}>
-          <Ionicons name="image-outline" size={28} color={COLORS.inactive} />
+const metaOf = (design: DesignDetail): string[] => {
+  const s = design.summary;
+  const parts: string[] = [];
+  if (s && s.floorArea > 0) parts.push(`${s.floorArea.toFixed(1).replace('.', ',')} m²`);
+  parts.push(`${design.placements.length} món`);
+  if (s && s.quoteTotal > 0) parts.push(`≈ ${formatShortPrice(s.quoteTotal)}`);
+  return parts;
+};
+
+const MoreButton: React.FC<{ design: DesignDetail; onMore: (d: DesignDetail) => void }> = ({ design, onMore }) => (
+  <Pressable
+    style={({ pressed }) => [styles.moreBtn, pressed && styles.pressed]}
+    hitSlop={6}
+    onPress={(): void => onMore(design)}
+    accessibilityRole="button"
+    accessibilityLabel={`Thao tác với thiết kế ${design.name}`}
+  >
+    <Ionicons name="ellipsis-horizontal" size={18} color={COLORS.textSecondary} />
+  </Pressable>
+);
+
+const DesignCard: React.FC<DesignCardProps> = ({ design, variant = 'grid', onPress, onMore }) => {
+  const type = roomTypeInfo(design.roomType);
+  const meta = metaOf(design);
+  const a11y = `${design.name}, ${type.label}, ${meta.join(', ')}, sửa ${formatRelative(design.updatedAt)}`;
+  const common = {
+    onPress: (): void => onPress(design),
+    onLongPress: onMore
+      ? (): void => {
+          haptic.press();
+          onMore(design);
+        }
+      : undefined,
+    delayLongPress: 350,
+    accessibilityRole: 'button' as const,
+    accessibilityLabel: a11y,
+    accessibilityHint: onMore ? 'Nhấn giữ để đổi tên, nhân bản hoặc xoá' : undefined,
+  };
+
+  if (variant === 'list') {
+    return (
+      <Pressable {...common} style={({ pressed }) => [styles.card, styles.listCard, pressed && styles.pressed]}>
+        <DesignThumb design={design} style={styles.listThumb} />
+        <View style={styles.listBody}>
+          <Text style={styles.title} numberOfLines={1}>
+            {design.name}
+          </Text>
+          <View style={styles.typeRow}>
+            <Ionicons name={type.icon} size={13} color={COLORS.accent} />
+            <Text style={styles.typeText} numberOfLines={1}>
+              {type.label}
+            </Text>
+          </View>
+          <Text style={styles.meta} numberOfLines={1}>
+            {meta.join(' · ')}
+          </Text>
         </View>
-      )}
-      <View style={styles.badge}>
-        <Ionicons name="cube-outline" size={12} color={COLORS.textPrimary} />
-        <Text style={styles.badgeText}>{design.placements.length}</Text>
+        <View style={styles.listRight}>
+          {onMore ? <MoreButton design={design} onMore={onMore} /> : null}
+          <Text style={styles.time}>{formatRelative(design.updatedAt)}</Text>
+        </View>
+      </Pressable>
+    );
+  }
+
+  const compact = variant === 'compact';
+  return (
+    <Pressable {...common} style={({ pressed }) => [styles.card, compact ? styles.compact : styles.grid, pressed && styles.pressed]}>
+      <DesignThumb design={design} style={compact ? styles.imageCompact : styles.imageGrid} />
+      <View style={[styles.tag, styles.tagLeft]} pointerEvents="none">
+        <Ionicons name={type.icon} size={12} color={COLORS.textPrimary} />
+        {compact ? null : (
+          <Text style={styles.tagText} numberOfLines={1}>
+            {type.label}
+          </Text>
+        )}
       </View>
       <View style={styles.info}>
-        <Text style={styles.title} numberOfLines={1}>
-          {design.name}
-        </Text>
-        <View style={styles.row}>
-          <Text style={styles.date}>{formatDate(design.updatedAt)}</Text>
-          {onDelete ? (
-            <Pressable
-              style={styles.deleteBtn}
-              hitSlop={4}
-              onPress={(): void => onDelete(design)}
-              accessibilityRole="button"
-              accessibilityLabel={`Xoá thiết kế ${design.name}`}
-            >
-              <Ionicons name="trash-outline" size={16} color={COLORS.textSecondary} />
-            </Pressable>
-          ) : null}
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, styles.flex]} numberOfLines={1}>
+            {design.name}
+          </Text>
+          {onMore ? <MoreButton design={design} onMore={onMore} /> : null}
         </View>
+        <Text style={styles.meta} numberOfLines={1}>
+          {meta.join(' · ')}
+        </Text>
+        <Text style={styles.time}>{`Sửa ${formatRelative(design.updatedAt)}`}</Text>
       </View>
     </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   card: { borderRadius: RADIUS.md, backgroundColor: COLORS.surface, overflow: 'hidden' },
   grid: { flex: 1 },
   compact: { width: 160, marginRight: 12 },
-  pressed: { opacity: 0.85 },
-  imageGrid: { width: '100%', aspectRatio: 1, backgroundColor: COLORS.surfaceAlt },
-  imageCompact: { width: '100%', height: 110, backgroundColor: COLORS.surfaceAlt },
-  noImage: { alignItems: 'center', justifyContent: 'center' },
-  badge: {
+  pressed: { opacity: 0.8 },
+  imageGrid: { width: '100%', aspectRatio: 1.15 },
+  imageCompact: { width: '100%', height: 110 },
+  tag: {
     position: 'absolute',
     top: 8,
-    right: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    maxWidth: '85%',
     paddingHorizontal: 8,
     height: 24,
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.overlay,
   },
-  badgeText: { fontSize: 11, fontWeight: '700', color: COLORS.textPrimary },
-  info: { padding: 10 },
-  // Vung bam 36 + hitSlop 4 moi phia = 44 (truoc day ~32, de bam nham mo thiet ke)
-  deleteBtn: { width: 36, height: 36, marginRight: -10, marginVertical: -10, alignItems: 'center', justifyContent: 'center' },
-  title: { ...TYPE.label, color: COLORS.textPrimary },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  date: { ...TYPE.caption, color: COLORS.textSecondary },
+  tagLeft: { left: 8 },
+  tagText: { fontSize: 12, fontFamily: FONT.semibold, color: COLORS.textPrimary },
+  info: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  title: { ...TYPE.label, fontSize: 15, color: COLORS.textPrimary },
+  meta: { ...TYPE.caption, color: COLORS.textSecondary, marginTop: 4 },
+  time: { ...TYPE.caption, color: COLORS.inactive, marginTop: 2 },
+  // Vung bam 32 + hitSlop 6 moi phia = 44
+  moreBtn: { width: 32, height: 32, marginRight: -6, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  /* Dang danh sach */
+  listCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10 },
+  listThumb: { width: 72, height: 72, borderRadius: RADIUS.sm },
+  listBody: { flex: 1, minWidth: 0 },
+  typeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  typeText: { ...TYPE.caption, color: COLORS.accent, fontFamily: FONT.semibold },
+  listRight: { alignItems: 'flex-end', justifyContent: 'space-between', alignSelf: 'stretch' },
 });
 
 export default DesignCard;

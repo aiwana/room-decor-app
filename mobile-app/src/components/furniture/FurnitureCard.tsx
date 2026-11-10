@@ -6,7 +6,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { COLORS, RADIUS, TYPE } from '@/constants/colors';
+import { COLORS, FONT, RADIUS, TYPE } from '@/constants/colors';
 import { formatDimensions, getCategoryLabel } from '@/constants/furniture';
 import type { Furniture } from '@/types';
 import { formatPrice } from '@/utils';
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
   category: { ...TYPE.caption, color: COLORS.textSecondary },
   title: { ...TYPE.label, color: COLORS.textPrimary, marginTop: 2, minHeight: 34 },
   size: { ...TYPE.caption, color: COLORS.textSecondary, marginTop: 3 },
-  price: { ...TYPE.label, fontWeight: '700', color: COLORS.accent, marginTop: 4, fontVariant: ['tabular-nums'] },
+  price: { ...TYPE.label, fontFamily: FONT.bold, color: COLORS.accent, marginTop: 4, fontVariant: ['tabular-nums'] },
   vendor: { ...TYPE.caption, color: COLORS.inactive, marginTop: 1 },
 });
 

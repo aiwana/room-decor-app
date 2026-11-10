@@ -32,4 +32,16 @@ public class RoomImage {
 
     @Column(name = "captured_at", nullable = false)
     private Instant capturedAt;
+
+    /** "photo" = uploaded photo; "blank" = empty/template room drawn by the user, no image file */
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private String source = SOURCE_PHOTO;
+
+    public static final String SOURCE_PHOTO = "photo";
+    public static final String SOURCE_BLANK = "blank";
+
+    public boolean isBlank() {
+        return SOURCE_BLANK.equals(source);
+    }
 }

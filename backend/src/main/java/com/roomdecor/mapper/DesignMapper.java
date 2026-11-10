@@ -24,7 +24,8 @@ public final class DesignMapper {
             d.getSkirtingMaterial(),
             placements,
             d.getCreatedAt(),
-            d.getUpdatedAt()
+            d.getUpdatedAt(),
+            d.getRoomType()
         );
     }
 

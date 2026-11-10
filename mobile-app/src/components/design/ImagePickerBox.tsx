@@ -8,7 +8,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 
-import { COLORS, RADIUS, SPACING, TOUCH_MIN } from '@/constants/colors';
+import { COLORS, FONT, RADIUS, SPACING, TOUCH_MIN } from '@/constants/colors';
 
 interface ImagePickerBoxProps {
   imageUri: string | null;
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     alignItems: 'center',
   },
-  hint: { marginTop: SPACING.sm, color: COLORS.textSecondary, fontSize: 13, textAlign: 'center' },
+  hint: { marginTop: SPACING.sm, color: COLORS.textSecondary, fontSize: 13, fontFamily: FONT.regular, textAlign: 'center' },
   row: { flexDirection: 'row', gap: 12, marginTop: SPACING.md },
   bigBtn: {
     flexDirection: 'row',
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.greenFrom,
   },
   bigBtnAlt: { backgroundColor: COLORS.slateFrom },
-  bigBtnText: { color: COLORS.textPrimary, fontWeight: '700' },
+  bigBtnText: { color: COLORS.textPrimary, fontFamily: FONT.bold },
   bigBtnTextOnAccent: { color: COLORS.onAccent },
   previewWrap: { marginHorizontal: SPACING.md, borderRadius: RADIUS.lg, overflow: 'hidden' },
   preview: { width: '100%', aspectRatio: 4 / 3, backgroundColor: COLORS.surfaceAlt },
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.overlay,
   },
-  smallBtnText: { color: COLORS.textPrimary, fontSize: 12, fontWeight: '600' },
+  smallBtnText: { color: COLORS.textPrimary, fontSize: 12, fontFamily: FONT.semibold },
 });
 
 export default ImagePickerBox;

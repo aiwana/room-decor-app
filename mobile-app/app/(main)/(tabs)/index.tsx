@@ -7,25 +7,27 @@
  * "Cai dat" nam trong Ho so (truoc day 3 loi vao cung 1 cho lam man hinh roi).
  */
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import SectionHeader from '@/components/common/SectionHeader';
+import { Skeleton } from '@/components/common/Skeleton';
 import DesignCard from '@/components/design/DesignCard';
+import DesignThumb from '@/components/design/DesignThumb';
 import FurnitureCard from '@/components/furniture/FurnitureCard';
 import InspirationCard from '@/components/home/InspirationCard';
-import { COLORS, RADIUS, SPACING, TOUCH_MIN, TYPE } from '@/constants/colors';
+import { COLORS, FONT, RADIUS, SPACING, TOUCH_MIN, TYPE } from '@/constants/colors';
 import { INSPIRATIONS } from '@/constants/inspirations';
 import { useDesigns } from '@/hooks/useDesigns';
 import { useFurniture } from '@/hooks/useFurniture';
 import { type PickedImage, useRoomImagePicker } from '@/hooks/useRoomImagePicker';
 import { useAuthStore } from '@/store/auth-store';
 import type { DesignDetail, Furniture } from '@/types';
-import { formatDate } from '@/utils';
+import { roomTypeInfo } from '@/constants/room-types';
+import { formatRelative } from '@/utils';
 
 const GRADIENT_GREEN = [COLORS.greenFrom, COLORS.greenTo] as const;
 const GRADIENT_SLATE = [COLORS.slateFrom, COLORS.slateTo] as const;
@@ -52,6 +54,10 @@ export default function HomeScreen() {
       pathname: '/new-design',
       params: { imageUri: image.uri, width: String(image.width), height: String(image.height) },
     });
+  };
+
+  const startWithout = (start: 'blank' | 'template'): void => {
+    router.navigate({ pathname: '/new-design', params: { start, t: String(Date.now()) } });
   };
 
   const handleSearch = (): void => {
@@ -143,6 +149,31 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
+        {/* Chua co anh phong (mua nha tren giay, phong chua xay...) -> phong trong / phong mau */}
+        <View style={styles.noPhoto}>
+          <Text style={styles.noPhotoText}>Chưa có ảnh phòng? Bắt đầu từ</Text>
+          <View style={styles.noPhotoActions}>
+            <Pressable
+              style={({ pressed }) => [styles.noPhotoBtn, pressed && styles.pressed]}
+              onPress={(): void => startWithout('blank')}
+              accessibilityRole="button"
+              accessibilityLabel="Tạo phòng trống"
+            >
+              <Ionicons name="square-outline" size={16} color={COLORS.accent} />
+              <Text style={styles.noPhotoBtnText}>Phòng trống</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.noPhotoBtn, pressed && styles.pressed]}
+              onPress={(): void => startWithout('template')}
+              accessibilityRole="button"
+              accessibilityLabel="Chọn phòng mẫu"
+            >
+              <Ionicons name="albums-outline" size={16} color={COLORS.accent} />
+              <Text style={styles.noPhotoBtnText}>Phòng mẫu</Text>
+            </Pressable>
+          </View>
+        </View>
+
         {/* ===== 3. TIEP TUC THIET KE GAN NHAT ===== */}
         {lastDesign ? (
           <Pressable
@@ -151,20 +182,18 @@ export default function HomeScreen() {
             accessibilityRole="button"
             accessibilityLabel={`Tiếp tục thiết kế ${lastDesign.name}`}
           >
-            {lastDesign.roomImageUri ? (
-              <Image source={{ uri: lastDesign.roomImageUri }} style={styles.continueThumb} contentFit="cover" />
-            ) : (
-              <View style={[styles.continueThumb, styles.continueThumbEmpty]}>
-                <Ionicons name="image-outline" size={22} color={COLORS.inactive} />
-              </View>
-            )}
+            <DesignThumb design={lastDesign} style={styles.continueThumb} />
             <View style={styles.continueText}>
               <Text style={styles.continueLabel}>Tiếp tục thiết kế</Text>
               <Text style={styles.continueName} numberOfLines={1}>
                 {lastDesign.name}
               </Text>
               <Text style={styles.continueMeta} numberOfLines={1}>
-                {lastDesign.placements.length} món nội thất · {formatDate(lastDesign.updatedAt)}
+                {[
+                  roomTypeInfo(lastDesign.roomType).label,
+                  `${lastDesign.placements.length} món`,
+                  `sửa ${formatRelative(lastDesign.updatedAt)}`,
+                ].join(' · ')}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={COLORS.inactive} />
@@ -189,7 +218,11 @@ export default function HomeScreen() {
         {/* ===== 6. NOI THAT NOI BAT ===== */}
         <SectionHeader title="Nội thất nổi bật" actionLabel="Xem tất cả" onAction={(): void => router.push('/furniture')} />
         {furnitureLoading && featured.length === 0 ? (
-          <ActivityIndicator color={COLORS.accent} />
+          <View style={[styles.listContent, styles.skeletonRow]}>
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} width={150} height={190} radius={RADIUS.md} />
+            ))}
+          </View>
         ) : featured.length === 0 ? (
           <Text style={styles.sectionMessage}>Chưa có nội thất nào.</Text>
         ) : (
@@ -224,12 +257,12 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.85 },
   header: { paddingHorizontal: SPACING.md, paddingTop: SPACING.sm },
   headerTitle: { ...TYPE.title, color: COLORS.textPrimary },
-  headerSubtitle: { ...TYPE.label, fontWeight: '400', color: COLORS.textSecondary, marginTop: 2 },
+  headerSubtitle: { ...TYPE.label, fontFamily: FONT.regular, color: COLORS.textSecondary, marginTop: 2 },
 
   mainActions: { flexDirection: 'row', gap: 12, marginTop: SPACING.lg, paddingHorizontal: SPACING.md },
   actionFlex: { flex: 1 },
   actionBox: { height: 140, borderRadius: RADIUS.lg, padding: SPACING.md, alignItems: 'center', justifyContent: 'center' },
-  actionBoxText: { ...TYPE.body, fontWeight: '700', marginTop: 10, color: COLORS.textPrimary, textAlign: 'center' },
+  actionBoxText: { ...TYPE.body, fontFamily: FONT.bold, marginTop: 10, color: COLORS.textPrimary, textAlign: 'center' },
   actionBoxTextDark: { color: COLORS.onAccent },
 
   continueRow: {
@@ -242,11 +275,28 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     backgroundColor: COLORS.surface,
   },
-  continueThumb: { width: 56, height: 56, borderRadius: RADIUS.sm, backgroundColor: COLORS.surfaceAlt },
-  continueThumbEmpty: { alignItems: 'center', justifyContent: 'center' },
+  continueThumb: { width: 64, height: 64, borderRadius: RADIUS.sm, overflow: 'hidden' },
+  noPhoto: { marginHorizontal: SPACING.md, marginTop: 12 },
+  noPhotoText: { ...TYPE.caption, color: COLORS.textSecondary, marginBottom: 6 },
+  noPhotoActions: { flexDirection: 'row', gap: 12 },
+  noPhotoBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: TOUCH_MIN,
+    paddingHorizontal: 12,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  noPhotoBtnText: { ...TYPE.label, color: COLORS.textPrimary },
+  skeletonRow: { flexDirection: 'row', gap: 12 },
   continueText: { flex: 1 },
-  continueLabel: { ...TYPE.caption, color: COLORS.accent, fontWeight: '600' },
-  continueName: { ...TYPE.body, fontWeight: '600', color: COLORS.textPrimary, marginTop: 2 },
+  continueLabel: { ...TYPE.caption, color: COLORS.accent, fontFamily: FONT.semibold },
+  continueName: { ...TYPE.body, fontFamily: FONT.semibold, color: COLORS.textPrimary, marginTop: 2 },
   continueMeta: { ...TYPE.caption, color: COLORS.textSecondary, marginTop: 2 },
 
   searchBar: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginHorizontal: SPACING.md, marginTop: 12 },
@@ -269,5 +319,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   listContent: { paddingHorizontal: SPACING.md },
-  sectionMessage: { paddingHorizontal: SPACING.md, ...TYPE.label, fontWeight: '400', color: COLORS.textSecondary },
+  sectionMessage: { paddingHorizontal: SPACING.md, ...TYPE.label, fontFamily: FONT.regular, color: COLORS.textSecondary },
 });

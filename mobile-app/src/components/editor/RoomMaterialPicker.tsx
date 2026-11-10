@@ -9,7 +9,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 
 import Button from '@/components/common/Button';
-import { COLORS, RADIUS, SPACING } from '@/constants/colors';
+import { COLORS, FONT, RADIUS, SPACING } from '@/constants/colors';
 import {
   FALLBACK_MATERIALS,
   SKIRTING_MATERIALS,
@@ -160,11 +160,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  title: { fontSize: 19, fontWeight: '700', color: COLORS.textPrimary },
-  hint: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
+  title: { fontSize: 18, fontFamily: FONT.bold, color: COLORS.textPrimary },
+  hint: { fontSize: 12, fontFamily: FONT.regular, color: COLORS.textSecondary, marginTop: 2 },
   content: { padding: SPACING.md, gap: SPACING.lg, paddingBottom: SPACING.xl },
   row: { gap: 8 },
-  rowLabel: { color: COLORS.textPrimary, fontSize: 14, fontWeight: '700' },
+  rowLabel: { color: COLORS.textPrimary, fontSize: 15, fontFamily: FONT.bold },
   options: { gap: SPACING.sm, paddingRight: SPACING.sm },
   option: {
     width: 88,
@@ -183,9 +183,9 @@ const styles = StyleSheet.create({
   },
   thumbSelected: { borderWidth: 2, borderColor: COLORS.accent },
   thumbImage: { width: '100%', height: '100%' },
-  optionLabel: { fontSize: 10, color: COLORS.textSecondary, minHeight: 26 },
-  optionLabelSelected: { color: COLORS.textPrimary, fontWeight: '700' },
-  price: { fontSize: 11, color: COLORS.accent, fontWeight: '700' },
+  optionLabel: { fontSize: 12, fontFamily: FONT.regular, color: COLORS.textSecondary, minHeight: 26 },
+  optionLabelSelected: { color: COLORS.textPrimary, fontFamily: FONT.bold },
+  price: { fontSize: 12, color: COLORS.accent, fontFamily: FONT.bold },
   footer: {
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,

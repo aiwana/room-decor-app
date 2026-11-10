@@ -665,4 +665,27 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
 });
 window.__READY__ = true;
+
+/* ---------------- Chup anh nho cho man "Cua toi" ---------------- */
+// Canvas WebGL khong giu khung hinh sau khi ve -> ve lai roi doc ngay trong cung 1 lan chay.
+// Thu nho con ~480px, JPEG 70% (~30-60 KB) roi gui ve app qua postMessage.
+window.__snapshot = function () {
+  try {
+    if (!window.ReactNativeWebView) return;
+    updateCutaway();
+    renderer.render(scene, camera);
+    const src = renderer.domElement;
+    const k = Math.min(1, 480 / Math.max(src.width, 1));
+    const c = document.createElement('canvas');
+    c.width = Math.round(src.width * k);
+    c.height = Math.round(src.height * k);
+    c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'snapshot', data: c.toDataURL('image/jpeg', 0.7) }));
+  } catch (e) {
+    // Anh bi "nhiem ban" (CORS) hoac het bo nho -> bo qua, man "Cua toi" dung mat bang thu nho
+  }
+};
+// Doi anh van / mo hinh tai xong mot chut roi chup; chup lai lan nua phong khi mang cham
+setTimeout(window.__snapshot, 2500);
+setTimeout(window.__snapshot, 8000);
 `;

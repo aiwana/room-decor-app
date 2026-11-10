@@ -58,7 +58,7 @@ public class GeminiVisionClient implements RoomVisionClient {
                 )));
             }
 
-            return RoomScanParser.parse(gemini.generateJson(parts, 0.1, Duration.ofSeconds(180)), "Room scanned by Gemini");
+            return RoomScanParser.parse(gemini.generateJson(parts, 0.0, Duration.ofSeconds(180)), "Room scanned by Gemini");
         } catch (BadRequestException e) {
             throw e;
         } catch (InterruptedException e) {

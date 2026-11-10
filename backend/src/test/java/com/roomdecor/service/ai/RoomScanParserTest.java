@@ -70,4 +70,12 @@ class RoomScanParserTest {
         assertThat(prompt).contains("Number of photos: 4.").contains("3.20 m long");
         assertThat(RoomScanPrompt.build(1, RoomVisionClient.ScanHints.NONE)).doesNotContain("measured");
     }
+
+    @Test
+    void promptMentionsMeasuredRoomSize() {
+        String prompt = RoomScanPrompt.build(2, new RoomVisionClient.ScanHints(null, 5.1, 3.6, 2.7));
+
+        assertThat(prompt).contains("LONGER side is 5.10 m").contains("SHORTER side is 3.60 m")
+            .contains("ceiling height: 2.70 m").doesNotContain("facing the camera in photo 1: it is");
+    }
 }

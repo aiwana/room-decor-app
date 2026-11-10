@@ -6,8 +6,9 @@ import React from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { COLORS, RADIUS, SPACING } from '@/constants/colors';
+import { COLORS, FONT, RADIUS, SPACING } from '@/constants/colors';
 import type { IoniconName } from '@/types';
+import { haptic } from '@/utils/haptics';
 
 interface ChipProps {
   label: string;
@@ -18,7 +19,14 @@ interface ChipProps {
 
 const Chip: React.FC<ChipProps> = ({ label, selected = false, onPress, iconName }) => (
   <Pressable
-    onPress={onPress}
+    onPress={
+      onPress
+        ? (): void => {
+            haptic.select();
+            onPress();
+          }
+        : undefined
+    }
     disabled={!onPress}
     accessibilityRole="button"
     accessibilityState={{ selected }}
@@ -46,7 +54,7 @@ const styles = StyleSheet.create({
   },
   selected: { borderColor: COLORS.accent, backgroundColor: COLORS.accentSoft },
   pressed: { opacity: 0.7 },
-  label: { fontSize: 13, color: COLORS.textSecondary, fontWeight: '600' },
+  label: { fontSize: 13, color: COLORS.textSecondary, fontFamily: FONT.semibold },
   labelSelected: { color: COLORS.textPrimary },
 });
 

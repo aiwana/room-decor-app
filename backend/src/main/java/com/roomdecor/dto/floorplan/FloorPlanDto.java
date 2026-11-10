@@ -16,5 +16,7 @@ public record FloorPlanDto(
     Integer pixelsPerMeter,
     String description,
     Instant createdAt,
-    Instant updatedAt
+    Instant updatedAt,
+    /** "photo" = scanned from a photo, "blank" = empty/template room (cannot be re-scanned) */
+    String source
 ) {}

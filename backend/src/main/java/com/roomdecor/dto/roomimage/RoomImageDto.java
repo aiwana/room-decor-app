@@ -12,5 +12,7 @@ public record RoomImageDto(
     String url,
     Integer width,
     Integer height,
-    Instant capturedAt
+    Instant capturedAt,
+    /** "photo" or "blank" (empty room created without a photo) */
+    String source
 ) {}
