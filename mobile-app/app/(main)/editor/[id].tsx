@@ -12,17 +12,24 @@
  *   - Thanh duoi  : khi chon 1 mon -> xoay 45°, nho hon, to hon, xoa (cho ai khong quen cu chi)
  *   - "AI goi y"  : bang AiSuggestSheet (sap xep lai / them do, phong cach, ghi chu) -> POST /api/ai/suggest-layout;
  *                   chua co khoa AI thi backend tu xep theo luat; co nut "Hoan tac" de quay lai bo tri cu
+ *   - Hoan tac / Lam lai (2 nut tron goc tren trai): moi thao tac (keo, them, xoa, xoay, to/nho, dich, AI goi y,
+ *                   sua hinh phong, quet lai, doi vat lieu) la 1 buoc, giu toi da 50 buoc (useUndoHistory).
+ *                   Buoc co doi hinh phong thi gui lai mat bang cu len may chu (PUT /api/floor-plans/{id})
+ *   - Mat bang 2D : khong dung ScrollView long nhau nua (Android de ScrollView "gianh" 1 huong keo, mon do
+ *                   chi chay theo 1 truc). Tu xu ly: chum 2 ngon = phong to, keo cho trong = di chuyen khung nhin,
+ *                   keo mon do = di chuyen tu do; dang keo hien khoang cach toi 4 phia tuong
  *   - "Luu"       : luu tren may + PUT /api/designs/{id}
  *
  * Toa do luu theo ti le (0..1) nen anh, mat bang va 3D dung chung 1 bo vi tri,
  * va mo tren man hinh khac kich thuoc van dung cho.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
-import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
+import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import Button from '@/components/common/Button';
@@ -35,8 +42,8 @@ import FurniturePicker from '@/components/editor/FurniturePicker';
 import PlacedItem, { MAX_SCALE, MIN_SCALE, type FrameSize } from '@/components/editor/PlacedItem';
 import QuoteSheet from '@/components/editor/QuoteSheet';
 import RoomMaterialPicker from '@/components/editor/RoomMaterialPicker';
-import RoomShapeEditor, { type RoomShapeResult } from '@/components/editor/RoomShapeEditor';
-import { COLORS, RADIUS, SPACING } from '@/constants/colors';
+import { type RoomShapeResult } from '@/components/editor/RoomShapeEditor';
+import { COLORS, FONT, RADIUS, SPACING, TOUCH_MIN, TYPE } from '@/constants/colors';
 import {
   DEFAULT_FLOOR_MATERIAL,
   DEFAULT_SKIRTING_MATERIAL,
@@ -44,21 +51,32 @@ import {
   FALLBACK_MATERIALS,
   getMaterialColor,
 } from '@/constants/materials';
+import { getCategoryIcon } from '@/constants/furniture';
 import { useAsync } from '@/hooks/useAsync';
+import { useUndoHistory } from '@/hooks/useUndoHistory';
+import { openRoomShapeEditor } from '@/store/room-shape-session';
 import { aiApi } from '@/services/ai-api';
 import { getErrorMessage } from '@/services/api-error';
 import { designApi } from '@/services/design-api';
-import { floorPlanApi } from '@/services/floor-plan-api';
+import { designMeta } from '@/services/design-meta';
+import { floorPlanApi, type FloorPlanPatch } from '@/services/floor-plan-api';
 import { furnitureApi } from '@/services/furniture-api';
 import { materialsApi } from '@/services/materials-api';
-import type { DesignDetail, FloorPlan, Furniture, FurniturePlacement, IoniconName } from '@/types';
+import type { DesignDetail, DesignSummary, FloorPlan, Furniture, FurniturePlacement, IoniconName } from '@/types';
 import { clamp, createId, firstParam, formatArea, formatPrice, toAssetUrl } from '@/utils';
 import { buildQuote } from '@/utils/quote';
-import { floorPlanPolygon, pushInside } from '@/utils/room-geometry';
+import { floorPlanPolygon, pushInside, type Point } from '@/utils/room-geometry';
+import { haptic } from '@/utils/haptics';
 
 /** Ti le khung anh mac dinh khi chua biet kich thuoc anh */
 const DEFAULT_RATIO = 4 / 3;
 const SCALE_STEP = 1.15;
+/** Nhan doi mon do: ban sao lech 30 cm theo ca 2 chieu de khong de len ban goc */
+const DUPLICATE_OFFSET_M = 0.3;
+/** Nut mui ten: dich mon do 10 cm moi lan bam (thay cho keo, cho ai kho keo chinh xac) */
+const NUDGE_M = 0.1;
+/** Che do anh (chua co mat bang): dich 2% khung anh */
+const NUDGE_PHOTO = 0.02;
 const CM_PER_M = 100;
 /** Mon do nho nhat tren mat bang (px) de van bam duoc */
 const MIN_PLAN_ITEM = 14;
@@ -76,6 +94,60 @@ const TIP_SEEN_KEY = 'roomdecor.editorTipSeen';
 
 type ViewMode = 'photo' | 'plan' | '3d';
 
+/** 1 buoc trong lich su Hoan tac / Lam lai */
+interface EditorSnapshot {
+  placements: FurniturePlacement[];
+  floorPlan: FloorPlan | null;
+  floorMaterial: string;
+  wallMaterial: string;
+  skirtingMaterial: string;
+}
+
+/** Phan hinh dang phong cua mat bang (gui lai len may chu khi hoan tac buoc sua phong) */
+const shapeOf = (p: FloorPlan): FloorPlanPatch => ({
+  roomWidth: p.roomWidth,
+  roomDepth: p.roomDepth,
+  ceilingHeight: p.ceilingHeight,
+  walls: p.walls,
+  openings: p.openings,
+});
+
+const sameShape = (a: FloorPlan, b: FloorPlan): boolean =>
+  a === b || JSON.stringify(shapeOf(a)) === JSON.stringify(shapeOf(b));
+
+/**
+ * Khoang cach (met) tu mep mon do toi tuong theo 4 huong: tia ngang / doc tu tam mon do,
+ * gap canh tuong gan nhat. hx, hy = nua be ngang / doc cua mon do (da tinh goc xoay).
+ * Am = mon do dang de len tuong; Infinity = khong gap tuong.
+ */
+const wallGaps = (
+  c: Point,
+  hx: number,
+  hy: number,
+  polygon: Point[],
+): { left: number; right: number; top: number; bottom: number } => {
+  let left = Infinity;
+  let right = Infinity;
+  let top = Infinity;
+  let bottom = Infinity;
+  polygon.forEach((a, i) => {
+    const b = polygon[(i + 1) % polygon.length];
+    if (a.y !== b.y && (a.y - c.y) * (b.y - c.y) <= 0) {
+      const x = a.x + ((c.y - a.y) / (b.y - a.y)) * (b.x - a.x);
+      if (x <= c.x) left = Math.min(left, c.x - x - hx);
+      else right = Math.min(right, x - c.x - hx);
+    }
+    if (a.x !== b.x && (a.x - c.x) * (b.x - c.x) <= 0) {
+      const y = a.y + ((c.x - a.x) / (b.x - a.x)) * (b.y - a.y);
+      if (y <= c.y) top = Math.min(top, c.y - y - hy);
+      else bottom = Math.min(bottom, y - c.y - hy);
+    }
+  });
+  return { left, right, top, bottom };
+};
+
+const formatGap = (v: number): string => (!Number.isFinite(v) ? '–' : v < -0.005 ? 'đè tường' : `${Math.max(0, v).toFixed(2)} m`);
+
 const VIEW_MODES: { id: ViewMode; label: string; icon: IoniconName }[] = [
   { id: 'photo', label: 'Ảnh', icon: 'image-outline' },
   { id: 'plan', label: 'Mặt bằng', icon: 'grid-outline' },
@@ -86,25 +158,41 @@ interface EditorData {
   design: DesignDetail;
   furniture: Furniture[];
   floorPlan: FloorPlan | null;
+  /** Mon do mang tu man "Chi tiet noi that" (nut "Dat vao thiet ke"), them ngay khi mo */
+  addItem: Furniture | null;
 }
 
 /** Mat bang khong tai duoc (mat mang...) thi van mo trinh chinh sua, chi thieu mat bang */
 const loadFloorPlan = (roomImageId: string | null): Promise<FloorPlan | null> =>
   roomImageId ? floorPlanApi.getByRoomImage(roomImageId).catch(() => null) : Promise.resolve(null);
 
-const loadEditorData = async (id: string): Promise<EditorData> => {
+const loadEditorData = async (id: string, addId?: string): Promise<EditorData> => {
   const design = await designApi.getById(id);
   const [list, floorPlan] = await Promise.all([furnitureApi.list(), loadFloorPlan(design.roomImageId)]);
-  return { design, furniture: list.items, floorPlan };
+  let addItem: Furniture | null = null;
+  if (addId) {
+    addItem = list.items.find((f) => f.id === addId) ?? (await furnitureApi.getById(addId).catch(() => null));
+  }
+  return { design, furniture: list.items, floorPlan, addItem };
 };
 
 export default function EditorScreen() {
-  const id = firstParam(useLocalSearchParams<{ id: string }>().id) ?? '';
-  const { data, loading, error, reload } = useAsync(() => loadEditorData(id), [id]);
+  const params = useLocalSearchParams<{ id: string; add?: string }>();
+  const id = firstParam(params.id) ?? '';
+  const addId = firstParam(params.add);
+  const { data, loading, error, reload } = useAsync(() => loadEditorData(id, addId), [id, addId]);
 
   if (loading && !data) return <LoadingView message="Đang mở thiết kế..." />;
   if (error || !data) return <ErrorView message={getErrorMessage(error)} onRetry={reload} />;
-  return <Editor key={data.design.id} design={data.design} furniture={data.furniture} initialFloorPlan={data.floorPlan} />;
+  return (
+    <Editor
+      key={data.design.id}
+      design={data.design}
+      furniture={data.furniture}
+      initialFloorPlan={data.floorPlan}
+      addItem={data.addItem}
+    />
+  );
 }
 
 /* =========================================================================== */
@@ -113,20 +201,28 @@ interface EditorProps {
   design: DesignDetail;
   furniture: Furniture[];
   initialFloorPlan: FloorPlan | null;
+  addItem?: Furniture | null;
 }
 
-function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
+function Editor({ design, furniture, initialFloorPlan, addItem }: EditorProps) {
   const navigation = useNavigation();
+  const router = useRouter();
 
   const [placements, setPlacements] = useState<FurniturePlacement[]>(design.placements);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiNote, setAiNote] = useState<string | null>(null);
+  const [aiNote, setAiNoteText] = useState<string | null>(null);
+  // Icon cua dong ghi chu: sparkles = loi AI, cube = thong bao thuong (vd vua dat do tu Chi tiet noi that)
+  const [noteIcon, setNoteIcon] = useState<IoniconName>('sparkles');
+  const setAiNote = useCallback((text: string | null, icon: IoniconName = 'sparkles'): void => {
+    setNoteIcon(icon);
+    setAiNoteText(text);
+  }, []);
   const [aiSheetOpen, setAiSheetOpen] = useState(false);
-  // Bo tri truoc lan goi y AI gan nhat, de "Hoan tac"
-  const [beforeAi, setBeforeAi] = useState<FurniturePlacement[] | null>(null);
+  // Phien ban lich su ngay sau lan AI goi y gan nhat: con dung so nay = chua thao tac gi them -> hien "Hoan tac" o ghi chu AI
+  const [aiStep, setAiStep] = useState<number | null>(null);
   const [showDescription, setShowDescription] = useState(false);
   const [tipVisible, setTipVisible] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -136,7 +232,10 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
   const [ratio, setRatio] = useState(DEFAULT_RATIO);
   // Mon do them tu bang chon co the chua nam trong danh sach tai luc dau (vd loc theo danh muc)
   const [extraFurniture, setExtraFurniture] = useState<Furniture[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>('photo');
+  // Phong trong / phong mau (khong co anh): mo thang mat bang, an tab "Ảnh" va nut "Quét lại"
+  const isBlankRoom = initialFloorPlan?.source === 'blank';
+  const viewModes = isBlankRoom ? VIEW_MODES.filter((m) => m.id !== 'photo') : VIEW_MODES;
+  const [viewMode, setViewMode] = useState<ViewMode>(isBlankRoom ? 'plan' : 'photo');
   const [floorPlan, setFloorPlan] = useState<FloorPlan | null>(initialFloorPlan);
   const [scanning, setScanning] = useState(false);
   const [floorMaterial, setFloorMaterial] = useState(design.floorMaterial ?? DEFAULT_FLOOR_MATERIAL);
@@ -144,9 +243,21 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
   const [skirtingMaterial, setSkirtingMaterial] = useState(
     design.skirtingMaterial ?? DEFAULT_SKIRTING_MATERIAL,
   );
-  const [shapeEditorOpen, setShapeEditorOpen] = useState(false);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [materialPickerOpen, setMaterialPickerOpen] = useState(false);
+
+  // Lich su Hoan tac / Lam lai. snapshotRef = trang thai dang hien thi (de ghi lai truoc moi thao tac)
+  const history = useUndoHistory<EditorSnapshot>();
+  const { record } = history;
+  const snapshotRef = useRef<EditorSnapshot>({ placements, floorPlan, floorMaterial, wallMaterial, skirtingMaterial });
+  snapshotRef.current = { placements, floorPlan, floorMaterial, wallMaterial, skirtingMaterial };
+  const restoringRef = useRef(false);
+  /** Ghi lai trang thai hien tai TRUOC khi thay doi; cung key trong windowMs = gop thanh 1 buoc */
+  const remember = useCallback(
+    (coalesceKey?: string, windowMs?: number): void => record(snapshotRef.current, coalesceKey, windowMs),
+    [record],
+  );
+  const aiUndoable = aiStep !== null && history.version === aiStep;
 
   const materialsState = useAsync(() => materialsApi.list(), []);
   const materials = materialsState.data?.length ? materialsState.data : FALLBACK_MATERIALS;
@@ -181,6 +292,63 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
       }
     : null;
   const selected = placements.find((p) => p.id === selectedId);
+  const selectedItem = selected ? furnitureById.get(selected.furnitureId) : undefined;
+
+  /* ---------------- Mat bang 2D: tu xu ly phong to + keo khung nhin (khong dung ScrollView) ---------------- */
+  const planContentW = planFrame ? planFrame.width + 2 * PLAN_PADDING : 0;
+  const planContentH = planFrame ? planFrame.height + 2 * PLAN_PADDING : 0;
+  const planViewW = planViewport?.width ?? 0;
+  const planViewH = planViewport?.height ?? 0;
+  const panX = useSharedValue(0);
+  const panY = useSharedValue(0);
+  const panStart = useSharedValue({ x: 0, y: 0 });
+  // Gioi han keo: noi dung khong troi ra khoi khung nhin (min <= pan <= 0)
+  const panBounds = useSharedValue({ minX: 0, minY: 0 });
+  const prevZoomRef = useRef(planZoom);
+  useEffect(() => {
+    const k = planZoom / prevZoomRef.current;
+    prevZoomRef.current = planZoom;
+    const minX = Math.min(0, planViewW - planContentW);
+    const minY = Math.min(0, planViewH - planContentH);
+    panBounds.value = { minX, minY };
+    // Phong to quanh giua khung nhin
+    panX.value = clamp(planViewW / 2 - (planViewW / 2 - panX.value) * k, minX, 0);
+    panY.value = clamp(planViewH / 2 - (planViewH / 2 - panY.value) * k, minY, 0);
+  }, [planZoom, planContentW, planContentH, planViewW, planViewH, panX, panY, panBounds]);
+  const planContentStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: panX.value }, { translateY: panY.value }],
+  }));
+
+  /* ---------------- Khoang cach toi tuong khi dang keo (chi ve lai o nho, khong ve lai ca man hinh) ---------------- */
+  const readoutRef = useRef<((text: string | null) => void) | null>(null);
+  const registerReadout = useCallback((fn: ((text: string | null) => void) | null): void => {
+    readoutRef.current = fn;
+  }, []);
+  const furnitureByIdRef = useRef(furnitureById);
+  furnitureByIdRef.current = furnitureById;
+  const handleDragMove = useCallback(
+    (placementId: string, x: number, y: number, rotationDeg: number, itemScale: number): void => {
+      const plan = snapshotRef.current.floorPlan;
+      const placement = snapshotRef.current.placements.find((p) => p.id === placementId);
+      if (!plan || !placement) return;
+      const item = furnitureByIdRef.current.get(placement.furnitureId);
+      const w = ((item?.width ?? 100) / CM_PER_M) * itemScale;
+      const d = ((item?.depth ?? 100) / CM_PER_M) * itemScale;
+      const r = (rotationDeg * Math.PI) / 180;
+      const cos = Math.abs(Math.cos(r));
+      const sin = Math.abs(Math.sin(r));
+      const gaps = wallGaps(
+        { x: x * plan.roomWidth, y: y * plan.roomDepth },
+        (cos * w + sin * d) / 2,
+        (sin * w + cos * d) / 2,
+        floorPlanPolygon(plan),
+      );
+      readoutRef.current?.(
+        `Trái ${formatGap(gaps.left)} · Phải ${formatGap(gaps.right)}\nTrên ${formatGap(gaps.top)} · Dưới ${formatGap(gaps.bottom)}`,
+      );
+    },
+    [],
+  );
   const floorItem = materials.find((m) => m.code === floorMaterial);
   const wallItem = materials.find((m) => m.code === wallMaterial);
   const skirtingItem = materials.find((m) => m.code === skirtingMaterial);
@@ -197,6 +365,50 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
         skirtingMaterial,
       }),
     [floorPlan, placements, furnitureById, materials, floorMaterial, wallMaterial, skirtingMaterial],
+  );
+
+  /* ---------------- Tom tat + anh 3D cho man "Của tôi" (luu tren may) ---------------- */
+  // Chi ghi khi da luu (dirty = false) de the o "Của tôi" khop voi ban da luu, khong phai ban dang sua do.
+  useEffect(() => {
+    if (dirty || !floorPlan) return;
+    const timer = setTimeout(() => {
+      const summary: DesignSummary = {
+        polygon: floorPlanPolygon(floorPlan),
+        roomWidth: floorPlan.roomWidth,
+        roomDepth: floorPlan.roomDepth,
+        items: placements.map((p) => {
+          const f = furnitureById.get(p.furnitureId);
+          return {
+            x: p.x * floorPlan.roomWidth,
+            y: p.y * floorPlan.roomDepth,
+            w: ((f?.width ?? 100) / CM_PER_M) * p.scale,
+            d: ((f?.depth ?? 100) / CM_PER_M) * p.scale,
+            rotation: p.rotation,
+          };
+        }),
+        floorArea: quote.floorArea ?? 0,
+        quoteTotal: quote.total,
+        source: floorPlan.source === 'blank' ? 'blank' : 'photo',
+      };
+      designMeta.update(design.id, { summary }).catch(() => undefined);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [dirty, floorPlan, placements, furnitureById, quote, design.id]);
+
+  // Anh 3D chup khi dang co thay doi chua luu -> giu lai, chi ghi khi bam Luu
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  const pendingThumbRef = useRef<string | null>(null);
+  const handleSnapshot = useCallback(
+    (dataUrl: string): void => {
+      if (dirtyRef.current) {
+        pendingThumbRef.current = dataUrl;
+        return;
+      }
+      pendingThumbRef.current = null;
+      designMeta.saveThumbnail(design.id, dataUrl).catch(() => undefined);
+    },
+    [design.id],
   );
 
   /** Kich thuoc that (met -> px) cua mon do tren mat bang */
@@ -232,23 +444,31 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
 
   useEffect(() => {
     // Ghi chu co nut "Hoan tac" thi giu lai den khi nguoi dung dong
-    if (!aiNote || beforeAi) return;
-    const timer = setTimeout(() => setAiNote(null), AI_NOTE_MS);
+    if (!aiNote || aiUndoable) return;
+    const timer = setTimeout(() => setAiNoteText(null), AI_NOTE_MS);
     return () => clearTimeout(timer);
-  }, [aiNote, beforeAi]);
+  }, [aiNote, aiUndoable]);
 
   /* ---------------- Thao tac tren danh sach do ---------------- */
-  const updatePlacements = (updater: (prev: FurniturePlacement[]) => FurniturePlacement[]): void => {
+  /** Moi thay doi danh sach do deu ghi 1 buoc lich su truoc (coalesceKey: gop cac lan bam lien tuc) */
+  const updatePlacements = (
+    updater: (prev: FurniturePlacement[]) => FurniturePlacement[],
+    coalesceKey?: string,
+  ): void => {
+    remember(coalesceKey);
     setPlacements(updater);
     setDirty(true);
   };
 
   const handleChange = useCallback(
     (placementId: string, patch: Pick<FurniturePlacement, 'x' | 'y' | 'rotation' | 'scale'>): void => {
+      readoutRef.current?.(null);
+      // Keo + chum cung luc ket thuc gan nhau -> van chi 1 buoc
+      remember(`gesture:${placementId}`, 400);
       setPlacements((prev) => prev.map((p) => (p.id === placementId ? { ...p, ...patch } : p)));
       setDirty(true);
     },
-    [],
+    [remember],
   );
 
   const handleSelect = useCallback((placementId: string): void => setSelectedId(placementId), []);
@@ -256,20 +476,65 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
   const addFurniture = (item: Furniture): void => {
     setPickerOpen(false);
     if (!furnitureById.has(item.id)) setExtraFurniture((prev) => [...prev, item]);
-    const placement: FurniturePlacement = { id: createId('pl'), furnitureId: item.id, x: 0.5, y: 0.6, rotation: 0, scale: 1 };
+    // Giua phong; phong chu L... diem giua co the nam ngoai san -> day vao trong
+    let x = 0.5;
+    let y = 0.6;
+    if (floorPlan) {
+      const inside = pushInside({ x: x * floorPlan.roomWidth, y: y * floorPlan.roomDepth }, floorPlanPolygon(floorPlan));
+      x = clamp(inside.x / floorPlan.roomWidth, 0, 1);
+      y = clamp(inside.y / floorPlan.roomDepth, 0, 1);
+    }
+    const placement: FurniturePlacement = { id: createId('pl'), furnitureId: item.id, x, y, rotation: 0, scale: 1 };
     updatePlacements((prev) => [...prev, placement]);
     setSelectedId(placement.id);
   };
 
-  const patchSelected = (patch: (p: FurniturePlacement) => Partial<FurniturePlacement>): void => {
+  // Mo tu "Chi tiet noi that" -> dat san mon do (chua luu: nguoi dung keo cho roi bam Luu)
+  const addedRef = useRef(false);
+  useEffect(() => {
+    if (!addItem || addedRef.current) return;
+    addedRef.current = true;
+    addFurniture(addItem);
+    setAiNote(`Đã đặt "${addItem.name}" vào giữa phòng. Kéo tới chỗ bạn muốn rồi bấm Lưu.`, 'cube-outline');
+    // chi chay 1 lan khi mo
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addItem]);
+
+  const patchSelected = (patch: (p: FurniturePlacement) => Partial<FurniturePlacement>, coalesceKey?: string): void => {
     if (!selectedId) return;
-    updatePlacements((prev) => prev.map((p) => (p.id === selectedId ? { ...p, ...patch(p) } : p)));
+    updatePlacements((prev) => prev.map((p) => (p.id === selectedId ? { ...p, ...patch(p) } : p)), coalesceKey);
+  };
+
+  /** Dich mon dang chon theo huong (dx, dy) = -1/0/1; y tang = xuong duoi man hinh */
+  const nudgeSelected = (dx: number, dy: number): void => {
+    const stepX = floorPlan ? NUDGE_M / floorPlan.roomWidth : NUDGE_PHOTO;
+    const stepY = floorPlan ? NUDGE_M / floorPlan.roomDepth : NUDGE_PHOTO;
+    // Bam mui ten nhieu lan lien tuc = 1 buoc Hoan tac
+    patchSelected((p) => ({ x: clamp(p.x + dx * stepX, 0, 1), y: clamp(p.y + dy * stepY, 0, 1) }), `nudge:${selectedId}`);
   };
 
   const removeSelected = (): void => {
     if (!selectedId) return;
+    haptic.warning();
     updatePlacements((prev) => prev.filter((p) => p.id !== selectedId));
     setSelectedId(null);
+  };
+
+  /** Nhan doi mon dang chon: ban sao lech 30 cm (hoac 4% khung anh), van nam trong san */
+  const duplicateSelected = (): void => {
+    const src = placements.find((p) => p.id === selectedId);
+    if (!src) return;
+    haptic.tap();
+    let x = clamp(src.x + (floorPlan ? DUPLICATE_OFFSET_M / floorPlan.roomWidth : 0.04), 0, 1);
+    let y = clamp(src.y + (floorPlan ? DUPLICATE_OFFSET_M / floorPlan.roomDepth : 0.04), 0, 1);
+    if (floorPlan) {
+      const inside = pushInside({ x: x * floorPlan.roomWidth, y: y * floorPlan.roomDepth }, floorPlanPolygon(floorPlan));
+      x = clamp(inside.x / floorPlan.roomWidth, 0, 1);
+      y = clamp(inside.y / floorPlan.roomDepth, 0, 1);
+    }
+    const copy: FurniturePlacement = { ...src, id: createId('pl'), x, y };
+    updatePlacements((prev) => [...prev, copy]);
+    setSelectedId(copy.id);
   };
 
   /* ---------------- AI goi y ---------------- */
@@ -290,8 +555,8 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
       const known = new Set(furnitureById.keys());
       const added = result.newFurniture.filter((f) => !known.has(f.id));
       if (added.length > 0) setExtraFurniture((prev) => [...prev, ...added]);
-      setBeforeAi(placements);
       updatePlacements(() => result.placements);
+      setAiStep(history.version + 1); // updatePlacements vua ghi 1 buoc -> version + 1
       setSelectedId(null);
       const suffix =
         result.source === 'rules'
@@ -317,12 +582,43 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
 
   const closeAiSheet = useCallback((): void => setAiSheetOpen(false), []);
 
+  /**
+   * Hoan tac / Lam lai 1 buoc. Buoc co doi hinh phong -> gui mat bang cu len may chu truoc,
+   * loi mang thi bao loi va giu nguyen lich su.
+   */
+  const restore = async (direction: 'undo' | 'redo'): Promise<void> => {
+    if (restoringRef.current) return;
+    const target = direction === 'undo' ? history.peekUndo() : history.peekRedo();
+    if (!target) return;
+    restoringRef.current = true;
+    try {
+      const current = snapshotRef.current;
+      let plan = target.floorPlan ?? current.floorPlan;
+      const shapeChanged = !!plan && !!current.floorPlan && !sameShape(plan, current.floorPlan);
+      if (plan && current.floorPlan && shapeChanged) {
+        plan = await floorPlanApi.update(current.floorPlan, shapeOf(plan));
+      }
+      if (direction === 'undo') history.undo(current);
+      else history.redo(current);
+      setPlacements(target.placements);
+      setFloorPlan(plan);
+      setFloorMaterial(target.floorMaterial);
+      setWallMaterial(target.wallMaterial);
+      setSkirtingMaterial(target.skirtingMaterial);
+      setDirty(true);
+      setSelectedId(null);
+      if (shapeChanged) setPlanZoom(1);
+    } catch (e) {
+      Alert.alert(direction === 'undo' ? 'Không hoàn tác được' : 'Không làm lại được', getErrorMessage(e));
+    } finally {
+      restoringRef.current = false;
+    }
+  };
+
   const undoAi = (): void => {
-    if (!beforeAi) return;
-    updatePlacements(() => beforeAi);
-    setBeforeAi(null);
     setAiNote(null);
-    setSelectedId(null);
+    setAiStep(null);
+    void restore('undo');
   };
 
   /* ---------------- AI quet phong -> mat bang ---------------- */
@@ -331,10 +627,15 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
       Alert.alert('Không quét được', 'Thiết kế này không còn ảnh phòng trên máy chủ.');
       return;
     }
+    if (isBlankRoom) {
+      Alert.alert('Phòng không có ảnh', 'Phòng này được tạo không cần ảnh. Bấm "Sửa phòng" để chỉnh tường và cửa.');
+      return;
+    }
     setScanning(true);
     try {
       // Quet lai van dung cac anh goc phong da chup luc tao thiet ke
       const result = await floorPlanApi.scan(design.roomImageId, { extraImageIds: floorPlan?.extraImageIds });
+      remember();
       setFloorPlan(result.floorPlan);
       setViewMode('plan');
     } catch (e) {
@@ -365,6 +666,12 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
         skirtingMaterial,
       });
       setDirty(false);
+      haptic.success();
+      const thumb = pendingThumbRef.current;
+      if (thumb) {
+        pendingThumbRef.current = null;
+        designMeta.saveThumbnail(design.id, thumb).catch(() => undefined);
+      }
     } catch (e) {
       Alert.alert('Không lưu được thiết kế', getErrorMessage(e));
     } finally {
@@ -379,6 +686,7 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
   const handleSaveShape = async ({ shift, ...patch }: RoomShapeResult): Promise<void> => {
     if (!floorPlan) return;
     const updated = await floorPlanApi.update(floorPlan, patch);
+    remember(); // 1 buoc gom ca hinh phong lan vi tri do bi day vao trong
     const polygon = floorPlanPolygon(updated);
     const moved = placements.map((p) => {
       const inside = pushInside(
@@ -393,10 +701,20 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
     });
     const changed = (a: number, b: number): boolean => Math.abs(a - b) > 1e-4;
     if (moved.some((p, i) => changed(p.x, placements[i].x) || changed(p.y, placements[i].y))) {
-      updatePlacements(() => moved);
+      setPlacements(moved);
+      setDirty(true);
     }
     setFloorPlan(updated);
     setPlanZoom(1);
+  };
+  // Man Sua phong goi ham luu qua ref -> luon dung ban moi nhat (placements, history...)
+  const saveShapeRef = useRef(handleSaveShape);
+  saveShapeRef.current = handleSaveShape;
+
+  /** Mo man "Sửa phòng" (man hinh rieng trong Stack, khong dung Modal - xem app/(main)/room-shape.tsx) */
+  const openShapeEditor = (): void => {
+    if (!floorPlan) return;
+    openRoomShapeEditor(router, { floorPlan, onSave: (r) => saveShapeRef.current(r) });
   };
 
   const onLayout = (e: LayoutChangeEvent): void => {
@@ -406,14 +724,28 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
 
   const zoomPlan = (factor: number): void => setPlanZoom((z) => clamp(z * factor, 1, MAX_PLAN_ZOOM));
 
-  // Cu chi tren nen mat bang (cho trong, khong phai mon do): cham = bo chon, chum 2 ngon = phong to
+  // Cu chi tren nen mat bang (cho trong, khong phai mon do):
+  //   cham = bo chon, chum 2 ngon = phong to, keo = di chuyen khung nhin (khi da phong to)
   const planBackgroundGesture = Gesture.Exclusive(
-    Gesture.Pinch()
-      .runOnJS(true)
-      .onEnd((e) => zoomPlan(e.scale)),
+    Gesture.Simultaneous(
+      Gesture.Pinch()
+        .runOnJS(true)
+        .onEnd((e) => zoomPlan(e.scale)),
+      Gesture.Pan()
+        .minDistance(6)
+        .onStart(() => {
+          panStart.value = { x: panX.value, y: panY.value };
+        })
+        .onUpdate((e) => {
+          panX.value = Math.min(0, Math.max(panBounds.value.minX, panStart.value.x + e.translationX));
+          panY.value = Math.min(0, Math.max(panBounds.value.minY, panStart.value.y + e.translationY));
+        }),
+    ),
     Gesture.Tap()
       .runOnJS(true)
-      .onEnd(() => setSelectedId(null)),
+      .onEnd(() => {
+        setSelectedId(null);
+      }),
   );
 
   /* ---------------- Render ---------------- */
@@ -422,12 +754,22 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
       <Stack.Screen
         options={{
           title: design.name,
+          // Trang thai luu (nut Luu chinh nam o thanh duoi, de bam bang ngon cai)
           headerRight: () => (
-            <Pressable onPress={(): void => void handleSave()} disabled={!dirty || saving} hitSlop={8} accessibilityRole="button">
-              <Text style={[styles.headerSave, (!dirty || saving) && styles.headerSaveDisabled]}>
-                {saving ? 'Đang lưu' : dirty ? 'Lưu' : 'Đã lưu'}
+            <View
+              style={[styles.saveStatus, dirty && styles.saveStatusDirty]}
+              accessibilityLiveRegion="polite"
+              accessibilityLabel={saving ? 'Đang lưu' : dirty ? 'Có thay đổi chưa lưu' : 'Đã lưu'}
+            >
+              <Ionicons
+                name={saving ? 'cloud-upload-outline' : dirty ? 'ellipse' : 'checkmark-circle'}
+                size={dirty && !saving ? 8 : 14}
+                color={dirty ? COLORS.warningText : COLORS.success}
+              />
+              <Text style={[styles.saveStatusText, dirty && styles.saveStatusTextDirty]}>
+                {saving ? 'Đang lưu' : dirty ? 'Chưa lưu' : 'Đã lưu'}
               </Text>
-            </Pressable>
+            </View>
           ),
         }}
       />
@@ -438,13 +780,15 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
         {/* ===== 1 dong: chon che do xem + nut vat lieu ===== */}
         <View style={styles.topBar}>
           <View style={styles.segment}>
-            {VIEW_MODES.map((m) => {
+            {viewModes.map((m) => {
               const active = viewMode === m.id;
               return (
                 <Pressable
                   key={m.id}
                   style={[styles.segmentItem, active && styles.segmentItemActive]}
+                  hitSlop={{ top: 6, bottom: 6 }}
                   onPress={(): void => {
+                    haptic.select();
                     setViewMode(m.id);
                     setSelectedId(null);
                   }}
@@ -521,21 +865,10 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
             ) : null}
 
             {containerWidth > 0 && viewMode === 'plan' && floorPlan && planFrame && planViewport ? (
-              // Phong to -> khung lon hon vung xem: keo cho trong de di chuyen (doc + ngang)
-              <ScrollView
-                style={planViewport}
-                scrollEnabled={planZoom > 1}
-                showsVerticalScrollIndicator={false}
-                nestedScrollEnabled
-              >
-                <ScrollView
-                  horizontal
-                  scrollEnabled={planZoom > 1}
-                  showsHorizontalScrollIndicator={false}
-                  nestedScrollEnabled
-                >
+              // Phong to -> noi dung lon hon khung nhin: keo cho trong de di chuyen (planContentStyle)
+              <View style={[planViewport, styles.planViewport]}>
                   {/* Le PLAN_PADDING quanh phong de ghi so do phia ngoai tuong */}
-                  <View style={{ width: planFrame.width + 2 * PLAN_PADDING, height: planFrame.height + 2 * PLAN_PADDING }}>
+                  <Animated.View style={[{ width: planContentW, height: planContentH }, planContentStyle]}>
                     {/* Nen (cho trong): cham = bo chon, chum 2 ngon = phong to. Nam DUOI noi that */}
                     <GestureDetector gesture={planBackgroundGesture}>
                       <View style={StyleSheet.absoluteFill} accessibilityLabel="Mặt bằng 2D của phòng">
@@ -565,13 +898,13 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
                               selected={p.id === selectedId}
                               onSelect={handleSelect}
                               onChange={handleChange}
+                              onDragMove={handleDragMove}
                             />
                           );
                         })}
                     </View>
-                  </View>
-                </ScrollView>
-              </ScrollView>
+                  </Animated.View>
+              </View>
             ) : null}
 
             {containerWidth > 0 && viewMode === '3d' && floorPlan ? (
@@ -584,6 +917,7 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
                   wallMaterial={wallMaterial}
                   skirtingMaterial={skirtingMaterial}
                   materials={materials}
+                  onSnapshot={handleSnapshot}
                 />
               </View>
             ) : null}
@@ -596,6 +930,25 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
               </View>
             ) : null}
           </View>
+
+          {/* Hoan tac / Lam lai: goc tren ben trai, dung cho ca 3 che do xem */}
+          {containerWidth > 0 ? (
+            <View style={styles.historyControls} pointerEvents="box-none">
+              <RoundButton
+                icon="arrow-undo"
+                label="Hoàn tác"
+                onPress={(): void => void restore('undo')}
+                disabled={!history.canUndo}
+              />
+              <RoundButton
+                icon="arrow-redo"
+                label="Làm lại"
+                onPress={(): void => void restore('redo')}
+                disabled={!history.canRedo}
+              />
+            </View>
+          ) : null}
+          {viewMode === 'plan' ? <DragReadout register={registerReadout} /> : null}
 
           {/* Nut gon o goc duoi ben phai, nam tren vung trong canh phong nen it khi che phong */}
           {viewMode !== 'photo' && floorPlan ? (
@@ -610,8 +963,14 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
                 </View>
               ) : null}
               <View style={styles.pillRow}>
-                <PillButton icon="construct-outline" label="Sửa phòng" onPress={(): void => setShapeEditorOpen(true)} />
-                <PillButton icon="scan-outline" label={scanning ? 'Đang quét...' : 'Quét lại'} onPress={handleScan} disabled={scanning} />
+                <PillButton
+                  icon="construct-outline"
+                  label="Sửa phòng"
+                  onPress={openShapeEditor}
+                />
+                {isBlankRoom ? null : (
+                  <PillButton icon="scan-outline" label={scanning ? 'Đang quét...' : 'Quét lại'} onPress={handleScan} disabled={scanning} />
+                )}
               </View>
             </View>
           ) : null}
@@ -658,11 +1017,11 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
 
         {aiNote ? (
           <View style={styles.aiNote}>
-            <Ionicons name="sparkles" size={16} color={COLORS.accent} />
+            <Ionicons name={noteIcon} size={16} color={COLORS.accent} />
             <Text style={styles.aiNoteText} numberOfLines={3}>
               {aiNote}
             </Text>
-            {beforeAi ? (
+            {aiUndoable ? (
               <Pressable onPress={undoAi} hitSlop={8} accessibilityRole="button" accessibilityLabel="Hoàn tác gợi ý">
                 <Text style={styles.aiUndo}>Hoàn tác</Text>
               </Pressable>
@@ -670,7 +1029,7 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
             <Pressable
               onPress={(): void => {
                 setAiNote(null);
-                setBeforeAi(null);
+                setAiStep(null);
               }}
               hitSlop={8}
               accessibilityLabel="Ẩn gợi ý"
@@ -681,25 +1040,78 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
         ) : null}
       </View>
 
-      {/* ===== Thanh dieu khien mon dang chon (co dinh, khong bi cat) ===== */}
+      {/* ===== Bang mon dang chon: ten + kich thuoc | Xoay · Co (-/+) · Nhan doi · Xoa | dich 10 cm ===== */}
       {selected ? (
         <View style={styles.selectedBar}>
-          <Text style={styles.selectedName} numberOfLines={1}>
-            {furnitureById.get(selected.furnitureId)?.name ?? 'Món đồ'}
-          </Text>
+          <View style={styles.selectedHeader}>
+            <View style={styles.selectedIcon}>
+              <Ionicons
+                name={getCategoryIcon(selectedItem?.category ?? '')}
+                size={18}
+                color={COLORS.accent}
+              />
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.selectedName} numberOfLines={1}>
+                {selectedItem?.name ?? 'Món đồ'}
+              </Text>
+              <Text style={styles.selectedMeta} numberOfLines={1}>
+                {selectedItem
+                  ? `${Math.round(selectedItem.width * selected.scale)} × ${Math.round(selectedItem.depth * selected.scale)} cm · xoay ${Math.round(selected.rotation)}°`
+                  : `xoay ${Math.round(selected.rotation)}°`}
+              </Text>
+            </View>
+            <Pressable
+              style={styles.selectedClose}
+              onPress={(): void => setSelectedId(null)}
+              hitSlop={4}
+              accessibilityRole="button"
+              accessibilityLabel="Bỏ chọn món đồ"
+            >
+              <Ionicons name="close" size={20} color={COLORS.textSecondary} />
+            </Pressable>
+          </View>
+
           <View style={styles.selectedActions}>
-            <ToolButton icon="refresh" label="Xoay" onPress={(): void => patchSelected((p) => ({ rotation: (p.rotation + 45) % 360 }))} />
             <ToolButton
-              icon="remove"
-              label="Nhỏ"
-              onPress={(): void => patchSelected((p) => ({ scale: clamp(p.scale / SCALE_STEP, MIN_SCALE, MAX_SCALE) }))}
+              icon="refresh"
+              label="Xoay 45°"
+              onPress={(): void => patchSelected((p) => ({ rotation: (p.rotation + 45) % 360 }), `rotate:${selectedId}`)}
             />
-            <ToolButton
-              icon="add"
-              label="To"
-              onPress={(): void => patchSelected((p) => ({ scale: clamp(p.scale * SCALE_STEP, MIN_SCALE, MAX_SCALE) }))}
-            />
+            <View style={styles.stepper} accessibilityRole="adjustable" accessibilityLabel={`Cỡ ${Math.round(selected.scale * 100)}%`}>
+              <Pressable
+                style={({ pressed }) => [styles.stepBtn, pressed && styles.toolPressed]}
+                onPress={(): void =>
+                  patchSelected((p) => ({ scale: clamp(p.scale / SCALE_STEP, MIN_SCALE, MAX_SCALE) }), `scale:${selectedId}`)
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Thu nhỏ món đồ"
+              >
+                <Ionicons name="remove" size={18} color={COLORS.textPrimary} />
+              </Pressable>
+              <Text style={styles.stepValue}>{`${Math.round(selected.scale * 100)}%`}</Text>
+              <Pressable
+                style={({ pressed }) => [styles.stepBtn, pressed && styles.toolPressed]}
+                onPress={(): void =>
+                  patchSelected((p) => ({ scale: clamp(p.scale * SCALE_STEP, MIN_SCALE, MAX_SCALE) }), `scale:${selectedId}`)
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Phóng to món đồ"
+              >
+                <Ionicons name="add" size={18} color={COLORS.textPrimary} />
+              </Pressable>
+            </View>
+            <ToolButton icon="copy-outline" label="Nhân đôi" onPress={duplicateSelected} />
             <ToolButton icon="trash-outline" label="Xoá" danger onPress={removeSelected} />
+          </View>
+
+          <View style={styles.nudgeRow}>
+            <Ionicons name="move-outline" size={16} color={COLORS.textSecondary} />
+            <Text style={styles.nudgeLabel}>{floorPlan ? 'Dịch từng 10 cm' : 'Dịch từng chút'}</Text>
+            <NudgeButton icon="arrow-back" label="Dịch sang trái" onPress={(): void => nudgeSelected(-1, 0)} />
+            <NudgeButton icon="arrow-up" label="Dịch lên trên" onPress={(): void => nudgeSelected(0, -1)} />
+            <NudgeButton icon="arrow-down" label="Dịch xuống dưới" onPress={(): void => nudgeSelected(0, 1)} />
+            <NudgeButton icon="arrow-forward" label="Dịch sang phải" onPress={(): void => nudgeSelected(1, 0)} />
           </View>
         </View>
       ) : null}
@@ -741,16 +1153,6 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
         </View>
       </View>
 
-      {floorPlan ? (
-        <RoomShapeEditor
-          visible={shapeEditorOpen}
-          floorPlan={floorPlan}
-          onClose={(): void => setShapeEditorOpen(false)}
-          onSave={handleSaveShape}
-        />
-      ) : null}
-
-
       <RoomMaterialPicker
         visible={materialPickerOpen}
         onClose={(): void => setMaterialPickerOpen(false)}
@@ -759,14 +1161,17 @@ function Editor({ design, furniture, initialFloorPlan }: EditorProps) {
         wallMaterial={wallMaterial}
         skirtingMaterial={skirtingMaterial}
         onChangeFloor={(id): void => {
+          remember('material:floor');
           setFloorMaterial(id);
           setDirty(true);
         }}
         onChangeWall={(id): void => {
+          remember('material:wall');
           setWallMaterial(id);
           setDirty(true);
         }}
         onChangeSkirting={(id): void => {
+          remember('material:skirting');
           setSkirtingMaterial(id);
           setDirty(true);
         }}
@@ -793,31 +1198,70 @@ interface OverlayButtonProps {
   disabled?: boolean;
 }
 
-/** Nut tron nho, nen mo (phong to / thu nho) */
-const RoundButton: React.FC<OverlayButtonProps> = ({ icon, label, onPress }) => (
-  <Pressable
-    style={({ pressed }) => [styles.roundBtn, pressed && styles.overlayPressed]}
-    onPress={onPress}
-    hitSlop={4}
-    accessibilityRole="button"
-    accessibilityLabel={label}
-  >
-    <Ionicons name={icon} size={18} color={COLORS.textPrimary} />
-  </Pressable>
-);
+/** O nho hien khoang cach toi tuong khi dang keo; tu giu state rieng nen khong ve lai ca trinh chinh sua */
+const DragReadout: React.FC<{ register: (fn: ((text: string | null) => void) | null) => void }> = ({ register }) => {
+  const [text, setText] = useState<string | null>(null);
+  useEffect(() => {
+    register(setText);
+    return () => register(null);
+  }, [register]);
+  if (!text) return null;
+  return (
+    <View style={styles.readout} pointerEvents="none" accessibilityLiveRegion="polite">
+      <Text style={styles.readoutText}>{text}</Text>
+    </View>
+  );
+};
 
-/** Nut vien tron co chu, nen mo (Sua phong / Quet lai) */
-const PillButton: React.FC<OverlayButtonProps> = ({ icon, label, onPress, disabled }) => (
+/*
+ * Nut noi tren mat bang (phong to, hoan tac, Sua phong, Quet lai).
+ * LOI CU "bam Sua phong luc duoc luc khong": nut chi cao 32-34px, phan con lai den 44px la hitSlop.
+ * hitSlop chi co tac dung ben JS; con react-native-gesture-handler (Android) tim view duoi ngon tay
+ * theo KHUNG THAT cua view -> cham vao phan hitSlop thi no thay nen mat bang ben duoi, cu chi
+ * "cham nen" (Tap) kich hoat va HUY luon lan bam cua nut -> modal Sua phong khong mo.
+ * Sua: vung bam that (HitArea) rong du 44px, co mau nen gan nhu trong suot de gesture-handler
+ * coi no la dich cham (view khong nen se bi bo qua), margin am de nut van nam dung cho cu.
+ */
+const HitArea: React.FC<{
+  pad: number;
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  children: (pressed: boolean) => React.ReactNode;
+}> = ({ pad, label, onPress, disabled, children }) => (
   <Pressable
-    style={({ pressed }) => [styles.pillBtn, (pressed || disabled) && styles.overlayPressed]}
+    style={[styles.hitArea, { padding: pad, margin: -pad }]}
     onPress={onPress}
     disabled={disabled}
     accessibilityRole="button"
     accessibilityLabel={label}
+    accessibilityState={{ disabled: !!disabled }}
   >
-    <Ionicons name={icon} size={14} color={COLORS.textPrimary} />
-    <Text style={styles.pillText}>{label}</Text>
+    {({ pressed }) => children(pressed)}
   </Pressable>
+);
+
+/** Nut tron nho, nen mo (phong to / thu nho / hoan tac) */
+const RoundButton: React.FC<OverlayButtonProps> = ({ icon, label, onPress, disabled }) => (
+  <HitArea pad={5} label={label} onPress={onPress} disabled={disabled}>
+    {(pressed) => (
+      <View style={[styles.roundBtn, pressed && styles.overlayPressed, disabled && styles.roundBtnDisabled]}>
+        <Ionicons name={icon} size={18} color={COLORS.textPrimary} />
+      </View>
+    )}
+  </HitArea>
+);
+
+/** Nut vien tron co chu, nen mo (Sua phong / Quet lai) */
+const PillButton: React.FC<OverlayButtonProps> = ({ icon, label, onPress, disabled }) => (
+  <HitArea pad={6} label={label} onPress={onPress} disabled={disabled}>
+    {(pressed) => (
+      <View style={[styles.pillBtn, (pressed || disabled) && styles.overlayPressed]}>
+        <Ionicons name={icon} size={14} color={COLORS.textPrimary} />
+        <Text style={styles.pillText}>{label}</Text>
+      </View>
+    )}
+  </HitArea>
 );
 
 interface ToolButtonProps {
@@ -829,8 +1273,20 @@ interface ToolButtonProps {
 
 const ToolButton: React.FC<ToolButtonProps> = ({ icon, label, onPress, danger }) => (
   <Pressable style={({ pressed }) => [styles.tool, pressed && styles.toolPressed]} onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
-    <Ionicons name={icon} size={20} color={danger ? COLORS.danger : COLORS.textPrimary} />
+    <Ionicons name={icon} size={20} color={danger ? COLORS.dangerText : COLORS.textPrimary} />
     <Text style={[styles.toolLabel, danger && styles.toolDanger]}>{label}</Text>
+  </Pressable>
+);
+
+/** Nut mui ten vuong 44x44 (dich mon do khong can keo) */
+const NudgeButton: React.FC<Omit<ToolButtonProps, 'danger'>> = ({ icon, label, onPress }) => (
+  <Pressable
+    style={({ pressed }) => [styles.nudgeBtn, pressed && styles.toolPressed]}
+    onPress={onPress}
+    accessibilityRole="button"
+    accessibilityLabel={label}
+  >
+    <Ionicons name={icon} size={20} color={COLORS.textPrimary} />
   </Pressable>
 );
 
@@ -839,8 +1295,19 @@ const OVERLAY_BG = 'rgba(0,0,0,0.6)';
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
   body: { flex: 1, overflow: 'hidden', paddingTop: SPACING.sm, paddingBottom: SPACING.sm },
-  headerSave: { fontSize: 15, fontWeight: '700', color: COLORS.accent },
-  headerSaveDisabled: { color: COLORS.inactive },
+  flex: { flex: 1, minWidth: 0 },
+  saveStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    height: 28,
+    borderRadius: RADIUS.pill,
+    backgroundColor: 'rgba(46,204,113,0.12)',
+  },
+  saveStatusDirty: { backgroundColor: COLORS.warningSoft },
+  saveStatusText: { fontSize: 12, fontFamily: FONT.semibold, color: COLORS.success },
+  saveStatusTextDirty: { color: COLORS.warningText },
 
   // 1 dong tren cung: che do xem + vat lieu
   topBar: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginHorizontal: SPACING.md, marginBottom: SPACING.sm },
@@ -863,7 +1330,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
   },
   segmentItemActive: { backgroundColor: COLORS.accentSoft },
-  segmentText: { fontSize: 12, fontWeight: '600', color: COLORS.textSecondary },
+  segmentText: { fontSize: 12, fontFamily: FONT.semibold, color: COLORS.textSecondary },
   segmentTextActive: { color: COLORS.textPrimary },
   materialBtn: {
     flexDirection: 'row',
@@ -881,10 +1348,30 @@ const styles = StyleSheet.create({
   stage: { flex: 1, minHeight: MIN_STAGE_HEIGHT, marginHorizontal: SPACING.md, alignItems: 'center', justifyContent: 'center' },
   frameWrap: { borderRadius: RADIUS.lg, overflow: 'hidden' },
   frame: { backgroundColor: COLORS.surfaceAlt, overflow: 'hidden' },
+  planViewport: { overflow: 'hidden' },
   planRoom: { position: 'absolute', left: PLAN_PADDING, top: PLAN_PADDING },
-  cornerControls: { position: 'absolute', right: 6, bottom: 6, alignItems: 'flex-end', gap: 8 },
-  zoomColumn: { gap: 6 },
-  pillRow: { flexDirection: 'row', gap: 6 },
+  historyControls: { position: 'absolute', left: 8, top: 8, flexDirection: 'row', gap: 10 },
+  readout: {
+    position: 'absolute',
+    top: 6,
+    left: 90,
+    right: 6,
+    alignItems: 'center',
+  },
+  readoutText: {
+    fontSize: 12,
+    fontFamily: FONT.semibold,
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: RADIUS.sm,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    overflow: 'hidden',
+  },
+  cornerControls: { position: 'absolute', right: 8, bottom: 8, alignItems: 'flex-end', gap: 12 },
+  zoomColumn: { gap: 10 },
+  pillRow: { flexDirection: 'row', gap: 12 },
   roundBtn: {
     width: 34,
     height: 34,
@@ -904,8 +1391,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
   },
-  pillText: { fontSize: 12, fontWeight: '600', color: COLORS.textPrimary },
+  pillText: { fontSize: 12, fontFamily: FONT.semibold, color: COLORS.textPrimary },
   overlayPressed: { opacity: 0.6 },
+  // Gan trong suot nhung KHAC 0: view khong co nen thi gesture-handler Android bo qua, cham xuyen xuong mat bang
+  hitArea: { backgroundColor: 'rgba(0,0,0,0.01)', borderRadius: RADIUS.pill },
+  roundBtnDisabled: { opacity: 0.35 },
   noPlan: {
     alignItems: 'center',
     gap: SPACING.md,
@@ -913,16 +1403,16 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     backgroundColor: COLORS.surface,
   },
-  noPlanText: { fontSize: 13, color: COLORS.textSecondary, textAlign: 'center', lineHeight: 19 },
+  noPlanText: { fontSize: 13, fontFamily: FONT.regular, color: COLORS.textSecondary, textAlign: 'center', lineHeight: 19 },
   noImage: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', padding: SPACING.md },
-  noImageText: { marginTop: SPACING.sm, fontSize: 13, color: COLORS.textSecondary, textAlign: 'center' },
+  noImageText: { marginTop: SPACING.sm, fontSize: 13, fontFamily: FONT.regular, color: COLORS.textSecondary, textAlign: 'center' },
 
   // Thong tin phong + huong dan + ghi chu AI
   planInfo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: SPACING.sm, marginHorizontal: SPACING.md },
-  planInfoDim: { fontSize: 13, fontWeight: '600', color: COLORS.textPrimary },
-  planInfoDesc: { fontSize: 12, color: COLORS.textSecondary, lineHeight: 17, textAlign: 'center', marginTop: 4, marginHorizontal: SPACING.md },
+  planInfoDim: { fontSize: 13, fontFamily: FONT.semibold, color: COLORS.textPrimary },
+  planInfoDesc: { fontSize: 12, fontFamily: FONT.regular, color: COLORS.textSecondary, lineHeight: 17, textAlign: 'center', marginTop: 4, marginHorizontal: SPACING.md },
   tipRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 6, paddingHorizontal: SPACING.md },
-  tip: { flexShrink: 1, fontSize: 12, color: COLORS.textSecondary, textAlign: 'center' },
+  tip: { flexShrink: 1, fontSize: 12, fontFamily: FONT.regular, color: COLORS.textSecondary, textAlign: 'center' },
   aiNote: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -933,8 +1423,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     backgroundColor: COLORS.surface,
   },
-  aiNoteText: { flex: 1, fontSize: 12, color: COLORS.textPrimary, lineHeight: 17 },
-  aiUndo: { fontSize: 13, fontWeight: '700', color: COLORS.accent },
+  aiNoteText: { flex: 1, fontSize: 12, fontFamily: FONT.regular, color: COLORS.textPrimary, lineHeight: 17 },
+  aiUndo: { fontSize: 13, fontFamily: FONT.bold, color: COLORS.accent },
 
   // Mon dang chon
   selectedBar: {
@@ -946,12 +1436,49 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.accent,
   },
-  selectedName: { fontSize: 14, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 6 },
-  selectedActions: { flexDirection: 'row', justifyContent: 'space-between' },
+  selectedHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  selectedIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.accentSoft,
+  },
+  selectedName: { fontSize: 15, fontFamily: FONT.bold, color: COLORS.textPrimary },
+  selectedMeta: { fontSize: 12, fontFamily: FONT.regular, color: COLORS.textSecondary, marginTop: 1 },
+  selectedClose: { width: TOUCH_MIN, height: TOUCH_MIN, marginRight: -8, alignItems: 'center', justifyContent: 'center' },
+  selectedActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.fill,
+  },
+  stepBtn: { width: 40, height: TOUCH_MIN, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.sm },
+  stepValue: { minWidth: 44, textAlign: 'center', fontSize: 13, fontFamily: FONT.semibold, color: COLORS.textPrimary },
   tool: { flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: RADIUS.sm },
   toolPressed: { backgroundColor: COLORS.surfaceAlt },
-  toolLabel: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
-  toolDanger: { color: COLORS.danger },
+  toolLabel: { ...TYPE.caption, color: COLORS.textSecondary, marginTop: 2 },
+  toolDanger: { color: COLORS.dangerText },
+  nudgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  nudgeLabel: { ...TYPE.caption, flex: 1, color: COLORS.textSecondary },
+  nudgeBtn: {
+    width: TOUCH_MIN,
+    height: TOUCH_MIN,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.fill,
+  },
 
   // Thanh duoi: bao gia + nut
   bottomArea: { borderTopWidth: 1, borderTopColor: COLORS.border, backgroundColor: COLORS.background },
@@ -963,9 +1490,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,
   },
-  quoteLabel: { flexShrink: 1, fontSize: 12, color: COLORS.textSecondary },
+  quoteLabel: { flexShrink: 1, fontSize: 12, fontFamily: FONT.regular, color: COLORS.textSecondary },
   quoteMore: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  quoteValue: { fontSize: 15, fontWeight: '700', color: COLORS.accent },
+  quoteValue: { fontSize: 15, fontFamily: FONT.bold, color: COLORS.accent },
   toolbar: {
     flexDirection: 'row',
     gap: SPACING.sm,

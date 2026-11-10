@@ -1,19 +1,24 @@
 package com.roomdecor.service;
 
+import com.roomdecor.dto.floorplan.CreateBlankRoomRequest;
 import com.roomdecor.dto.floorplan.FloorPlanDto;
 import com.roomdecor.dto.floorplan.UpdateFloorPlanRequest;
 import com.roomdecor.entity.FloorPlan;
 import com.roomdecor.entity.Opening;
 import com.roomdecor.entity.RoomImage;
+import com.roomdecor.entity.User;
 import com.roomdecor.entity.WallSegment;
 import com.roomdecor.exception.BadRequestException;
 import com.roomdecor.exception.ResourceNotFoundException;
 import com.roomdecor.mapper.FloorPlanMapper;
 import com.roomdecor.repository.FloorPlanRepository;
+import com.roomdecor.repository.RoomImageRepository;
+import com.roomdecor.repository.UserRepository;
 import com.roomdecor.service.ai.RoomVisionClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -22,10 +27,60 @@ import java.util.UUID;
 @Transactional
 public class FloorPlanService {
 
-    private final FloorPlanRepository floorPlanRepository;
+    static final int DEFAULT_PIXELS_PER_METER = 100;
+    static final String BLANK_DESCRIPTION = "Phòng do bạn tự tạo (không quét từ ảnh). Bấm \"Sửa phòng\" để chỉnh tường, cửa đi và cửa sổ.";
 
-    public FloorPlanService(FloorPlanRepository floorPlanRepository) {
+    private final FloorPlanRepository floorPlanRepository;
+    private final RoomImageRepository roomImageRepository;
+    private final UserRepository userRepository;
+
+    public FloorPlanService(FloorPlanRepository floorPlanRepository,
+                            RoomImageRepository roomImageRepository,
+                            UserRepository userRepository) {
         this.floorPlanRepository = floorPlanRepository;
+        this.roomImageRepository = roomImageRepository;
+        this.userRepository = userRepository;
+    }
+
+    /**
+     * Empty or template room, no photo. A "blank" room image row is created so the rest of the app
+     * (designs, editor, AI layout suggestion) keeps working with roomImageId as before.
+     * The shape is cleaned by FloorPlanGeometry like an AI result: without walls it is a rectangle.
+     */
+    public FloorPlanDto createBlank(CreateBlankRoomRequest request, UUID userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        List<WallSegment> walls = request.walls() == null ? List.of()
+            : request.walls().stream().map(FloorPlanMapper::toWallEntity).toList();
+        List<Opening> openings = request.openings() == null ? List.of()
+            : request.openings().stream().map(FloorPlanMapper::toOpeningEntity).toList();
+        for (Opening o : openings) {
+            if (!Opening.DOOR.equals(o.type()) && !Opening.WINDOW.equals(o.type())) {
+                throw new BadRequestException("Opening type must be 'door' or 'window'");
+            }
+        }
+        if (!walls.isEmpty() && walls.size() < 3) {
+            throw new BadRequestException("A room needs at least 3 walls");
+        }
+
+        double ceiling = request.ceilingHeight() == null ? FloorPlanGeometry.DEFAULT_CEILING : request.ceilingHeight();
+        String description = request.description() == null || request.description().isBlank()
+            ? BLANK_DESCRIPTION : request.description();
+        RoomVisionClient.RoomAnalysisResult shape = FloorPlanGeometry.normalize(new RoomVisionClient.RoomAnalysisResult(
+            request.roomWidth(), request.roomDepth(), ceiling, walls, openings, description));
+
+        RoomImage image = roomImageRepository.save(RoomImage.builder()
+            .user(user)
+            .url(RoomImage.SOURCE_BLANK)
+            .width(0)
+            .height(0)
+            .capturedAt(Instant.now())
+            .source(RoomImage.SOURCE_BLANK)
+            .build());
+
+        FloorPlan fp = createFromScan(image, List.of(), shape, DEFAULT_PIXELS_PER_METER);
+        return FloorPlanMapper.toDto(fp);
     }
 
     @Transactional(readOnly = true)

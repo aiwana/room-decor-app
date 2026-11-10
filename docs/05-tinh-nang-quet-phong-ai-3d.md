@@ -58,7 +58,15 @@ Lấy IP máy tính bằng `ipconfig` (dòng IPv4 của Wi-Fi), rồi sửa 2 fi
 
 ### Quét phòng bằng nhiều ảnh (tab "Thiết kế mới")
 - Ảnh chính là bắt buộc. Có thể chụp thêm tối đa **5 ảnh góc phòng**, app gợi ý đứng ở đâu để chụp.
-- Nhập **chiều dài 1 bức tường** (thước dây) để AI tính kích thước đúng hơn.
+- Bảng **"Cách chụp cho chính xác"** tự mở ở lần đầu vào màn này (sau đó bấm link dưới khung ảnh để xem lại):
+  sơ đồ 5 vị trí đứng chụp, ví dụ ảnh tốt / chưa tốt, 5 mẹo (cầm ngang, chụp chéo từ góc, bật đèn, ảnh trùng nhau một phần, đo bằng thước).
+  Muốn xem lại lần "tự mở" khi test: xoá dữ liệu Expo Go hoặc xoá khoá AsyncStorage `roomdecor.scanGuideSeen`.
+- Ảnh chụp **dọc** (cao hơn rộng) hiện cảnh báo vàng, vì AI thấy ít tường hơn ảnh ngang.
+- Mục **"Đo thêm cho chính xác hơn"** đóng sẵn, không bắt buộc: chiều dài, chiều rộng phòng (0.5 đến 30 m) và chiều cao trần (1.8 đến 6 m).
+  Nhập cả dài và rộng thì mặt bằng được kéo đúng 2 số đó (số lớn hơn khớp với cạnh dài, không cần biết phòng nằm theo hướng nào);
+  chỉ nhập 1 số thì cả phòng phóng to / thu nhỏ đều theo số đó; không nhập gì thì giữ kết quả AI.
+- Sau khi AI trả kết quả, backend tự **làm sạch** mặt bằng (`ScanCorrection`): tường gần thẳng (lệch dưới 10°) được nắn thẳng, góc vuông,
+  bỏ các đoạn tường ngắn hơn 20 cm, làm tròn theo lưới 5 cm, kéo cửa nằm đúng lên tường. Tường xiên thật (vd góc cắt 45°) được giữ nguyên.
 - Quét có thể mất 30 đến 90 giây khi gửi nhiều ảnh.
 
 ### Sửa hình phòng ("Mặt bằng" > "Sửa phòng")

@@ -14,7 +14,7 @@ import { MockModeNotice, Notice } from '@/components/common/Notice';
 import { EmptyView, ErrorView, LoadingView } from '@/components/common/StateViews';
 import FurnitureCard from '@/components/furniture/FurnitureCard';
 import { USE_MOCK } from '@/constants';
-import { COLORS, SPACING } from '@/constants/colors';
+import { COLORS, FONT, SPACING } from '@/constants/colors';
 import { FURNITURE_CATEGORIES } from '@/constants/furniture';
 import { useFurniture } from '@/hooks/useFurniture';
 import { getErrorMessage } from '@/services/api-error';
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
     paddingHorizontal: 14,
   },
-  searchInput: { flex: 1, marginLeft: 8, fontSize: 14, color: COLORS.textPrimary },
+  searchInput: { flex: 1, marginLeft: 8, fontSize: 15, fontFamily: FONT.regular, color: COLORS.textPrimary },
   chips: { paddingHorizontal: SPACING.md, paddingVertical: 12 },
   list: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.xl },
   column: { gap: 12 },

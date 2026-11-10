@@ -23,10 +23,20 @@ public interface RoomVisionClient {
     record ImageInput(String url, byte[] bytes, String mimeType) {}
 
     /**
-     * @param referenceLengthMeters real length of the wall facing the camera in the main photo, or null
+     * What the user measured (all optional, null = not given).
+     *
+     * @param referenceLengthMeters real length of the wall facing the camera in the main photo (older app versions)
+     * @param roomLengthMeters      length of the room (the longer side)
+     * @param roomWidthMeters       width of the room (the shorter side)
+     * @param ceilingHeightMeters   floor-to-ceiling height
      */
-    record ScanHints(Double referenceLengthMeters) {
-        public static final ScanHints NONE = new ScanHints(null);
+    record ScanHints(Double referenceLengthMeters, Double roomLengthMeters, Double roomWidthMeters,
+                     Double ceilingHeightMeters) {
+        public static final ScanHints NONE = new ScanHints(null, null, null, null);
+
+        public ScanHints(Double referenceLengthMeters) {
+            this(referenceLengthMeters, null, null, null);
+        }
     }
 
     record RoomAnalysisResult(

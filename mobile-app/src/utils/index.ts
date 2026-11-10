@@ -58,6 +58,21 @@ export const formatShortPrice = (value?: number | null, unit?: string | null): s
 
 export const formatArea = (value: number): string => `${value.toFixed(1)} m²`;
 
+/** ISO -> "vừa xong", "5 phút trước", "3 giờ trước", "hôm qua", "4 ngày trước", qua 1 tuan thi ra ngay */
+export const formatRelative = (iso: string, now = Date.now()): string => {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return '';
+  const min = Math.floor((now - t) / 60000);
+  if (min < 1) return 'vừa xong';
+  if (min < 60) return `${min} phút trước`;
+  const hours = Math.floor(min / 60);
+  if (hours < 24) return `${hours} giờ trước`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'hôm qua';
+  if (days < 7) return `${days} ngày trước`;
+  return formatDate(iso);
+};
+
 /** Duong dan tuong doi tu backend (/furniture/..., /materials/...) -> URL day du */
 export const toAssetUrl = (path?: string | null): string | undefined => {
   if (!path) return undefined;

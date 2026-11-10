@@ -13,7 +13,7 @@ import { Notice } from '@/components/common/Notice';
 import { EmptyView, ErrorView, LoadingView } from '@/components/common/StateViews';
 import FurnitureCard from '@/components/furniture/FurnitureCard';
 import { USE_MOCK } from '@/constants';
-import { COLORS, RADIUS, SPACING } from '@/constants/colors';
+import { COLORS, FONT, RADIUS, SPACING } from '@/constants/colors';
 import { FURNITURE_CATEGORIES } from '@/constants/furniture';
 import { useFurniture } from '@/hooks/useFurniture';
 import { getErrorMessage } from '@/services/api-error';
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  title: { fontSize: 18, fontWeight: 'bold', color: COLORS.textPrimary },
+  title: { fontSize: 18, fontFamily: FONT.bold, color: COLORS.textPrimary },
   chips: { paddingHorizontal: SPACING.md, paddingVertical: 12 },
   list: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.xl },
   column: { gap: 12 },

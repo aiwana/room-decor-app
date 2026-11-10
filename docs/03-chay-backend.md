@@ -80,7 +80,7 @@ Kết quả chi tiết nằm trong `target/surefire-reports/`.
 
 ## 6. AI quét phòng ra mặt bằng 2D
 
-`POST /api/ai/scan-room` nhận `roomImageId` của ảnh chính (có thể kèm tối đa 5 ảnh phụ `extraImageIds` và số đo thật `referenceLengthMeters`, xem [api.md](api.md#ai)), tạo bảng ghi `floor_plans` (kích thước phòng theo mét, các bức tường dạng đa giác, cửa ra vào và cửa sổ). Backend đọc ảnh từ ổ đĩa và gửi thẳng cho AI, nên không cần địa chỉ công khai.
+`POST /api/ai/scan-room` nhận `roomImageId` của ảnh chính (có thể kèm tối đa 5 ảnh phụ `extraImageIds` và số đo thật `roomLengthMeters`, `roomWidthMeters`, `ceilingHeightMeters`, xem [api.md](api.md#ai)), tạo bảng ghi `floor_plans` (kích thước phòng theo mét, các bức tường dạng đa giác, cửa ra vào và cửa sổ). Backend đọc ảnh từ ổ đĩa và gửi thẳng cho AI, nên không cần địa chỉ công khai.
 
 - **Chọn AI** bằng `AI_PROVIDER` trong `.env` (`gemini` | `openai` | `mock`). Để trống thì tự chọn: có `GEMINI_API_KEY` dùng Gemini, không thì OpenAI, không có key nào thì Mock.
 - **Mock** (mặc định khi không có key): `MockVisionClient` trả về phòng hình chữ nhật 4m x 4m, trần 2,7m, 1 cửa ra vào. Đủ để làm và test giao diện.

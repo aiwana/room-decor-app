@@ -3,7 +3,7 @@ import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'reac
 import { Ionicons } from '@expo/vector-icons';
 
 import Button from '@/components/common/Button';
-import { COLORS, RADIUS, SPACING } from '@/constants/colors';
+import { COLORS, FONT, RADIUS, SPACING } from '@/constants/colors';
 import type { QuoteLine, QuoteSummary } from '@/utils/quote';
 import { formatPrice } from '@/utils';
 
@@ -118,18 +118,18 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: SPACING.md },
-  title: { fontSize: 19, fontWeight: '700', color: COLORS.textPrimary },
-  subtitle: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
+  title: { fontSize: 18, fontFamily: FONT.bold, color: COLORS.textPrimary },
+  subtitle: { fontSize: 12, fontFamily: FONT.regular, color: COLORS.textSecondary, marginTop: 2 },
   scroll: { flexGrow: 0 },
   scrollContent: { gap: 4, paddingBottom: 4 },
-  section: { fontSize: 12, fontWeight: '700', color: COLORS.textSecondary, marginTop: SPACING.sm },
+  section: { fontSize: 12, fontFamily: FONT.bold, color: COLORS.textSecondary, marginTop: SPACING.sm },
   line: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingVertical: 5 },
   lineText: { flex: 1, gap: 1 },
-  lineLabel: { fontSize: 13, fontWeight: '600', color: COLORS.textPrimary },
-  lineDetail: { fontSize: 11, color: COLORS.textSecondary },
-  lineAmount: { fontSize: 13, fontWeight: '700', color: COLORS.accent },
-  empty: { fontSize: 13, lineHeight: 19, color: COLORS.textSecondary, marginTop: SPACING.sm },
-  note: { fontSize: 11, lineHeight: 16, color: COLORS.inactive, marginTop: 4 },
+  lineLabel: { fontSize: 13, fontFamily: FONT.semibold, color: COLORS.textPrimary },
+  lineDetail: { fontSize: 12, fontFamily: FONT.regular, color: COLORS.textSecondary },
+  lineAmount: { fontSize: 13, fontFamily: FONT.bold, color: COLORS.accent },
+  empty: { fontSize: 13, fontFamily: FONT.regular, lineHeight: 19, color: COLORS.textSecondary, marginTop: SPACING.sm },
+  note: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 16, color: COLORS.inactive, marginTop: 4 },
   totalRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -138,8 +138,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
   },
-  totalLabel: { fontSize: 14, fontWeight: '700', color: COLORS.textPrimary },
-  totalValue: { fontSize: 20, fontWeight: '700', color: COLORS.accent },
+  totalLabel: { fontSize: 15, fontFamily: FONT.bold, color: COLORS.textPrimary },
+  totalValue: { fontSize: 18, fontFamily: FONT.bold, color: COLORS.accent },
 });
 
 export default QuoteSheet;

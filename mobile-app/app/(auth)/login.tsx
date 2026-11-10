@@ -8,6 +8,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } fro
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
+import AuthBrand from '@/components/common/AuthBrand';
 import Button from '@/components/common/Button';
 import FormField from '@/components/common/FormField';
 import { MockModeNotice } from '@/components/common/Notice';
@@ -62,12 +63,7 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <View style={styles.brand}>
-          <View style={styles.logo}>
-            <Ionicons name="home" size={34} color={COLORS.accent} />
-          </View>
-          <Text style={styles.brandName}>RoomDecor</Text>
-        </View>
+        <AuthBrand />
 
         <Text style={styles.title}>Chào mừng trở lại</Text>
         <Text style={styles.subtitle}>Đăng nhập để sắp xếp nội thất cho căn phòng của bạn.</Text>
@@ -79,7 +75,7 @@ export default function LoginScreen() {
 
         {formError ? (
           <View style={styles.formError}>
-            <Ionicons name="alert-circle" size={18} color={COLORS.danger} />
+            <Ionicons name="alert-circle" size={18} color={COLORS.dangerText} />
             <Text style={styles.formErrorText}>{formError}</Text>
           </View>
         ) : null}

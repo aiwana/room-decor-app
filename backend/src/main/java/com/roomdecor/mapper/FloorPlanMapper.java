@@ -30,7 +30,8 @@ public final class FloorPlanMapper {
             fp.getPixelsPerMeter(),
             fp.getDescription(),
             fp.getCreatedAt(),
-            fp.getUpdatedAt()
+            fp.getUpdatedAt(),
+            fp.getRoomImage().getSource()
         );
     }
 

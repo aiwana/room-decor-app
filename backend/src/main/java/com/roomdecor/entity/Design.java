@@ -32,6 +32,15 @@ public class Design {
     @JoinColumn(name = "room_image_id")
     private RoomImage roomImage;
 
+    /** Loai phong: living, bedroom, kitchen, dining, office, kids, bathroom, other (xem ROOM_TYPES) */
+    @Column(name = "room_type", nullable = false, length = 30)
+    @Builder.Default
+    private String roomType = ROOM_TYPE_OTHER;
+
+    public static final String ROOM_TYPE_OTHER = "other";
+    /** Khop CHECK constraint chk_designs_room_type (V10) */
+    public static final String ROOM_TYPE_PATTERN = "living|bedroom|kitchen|dining|office|kids|bathroom|other";
+
     @Column(name = "floor_material", nullable = false, length = 50)
     @Builder.Default
     private String floorMaterial = "wood";

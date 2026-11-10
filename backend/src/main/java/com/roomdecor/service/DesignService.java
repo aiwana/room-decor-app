@@ -59,6 +59,8 @@ public class DesignService {
             .user(user)
             .name(request.name())
             .roomImage(roomImage)
+            .roomType(request.roomType() == null || request.roomType().isBlank()
+                ? Design.ROOM_TYPE_OTHER : request.roomType())
             .build();
 
         design = designRepository.save(design);
@@ -77,6 +79,9 @@ public class DesignService {
 
         if (request.name() != null && !request.name().isBlank()) {
             design.setName(request.name());
+        }
+        if (request.roomType() != null && !request.roomType().isBlank()) {
+            design.setRoomType(request.roomType());
         }
         if (request.floorMaterial() != null && !request.floorMaterial().isBlank()) {
             design.setFloorMaterial(request.floorMaterial());

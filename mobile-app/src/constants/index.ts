@@ -63,4 +63,8 @@ export const STORAGE_KEYS = {
   MOCK_USER: 'roomdecor.mockUser',
   /** Mat bang gia theo roomImageId (chi dung khi USE_MOCK) */
   MOCK_FLOOR_PLANS: 'roomdecor.mockFloorPlans',
+  /** Anh 3D + tom tat cua tung thiet ke de ve the o man "Của tôi" - xem services/design-meta.ts */
+  DESIGN_META: 'roomdecor.designMeta',
+  /** Man "Của tôi": kieu xem (luoi/danh sach) + cach sap xep lan truoc */
+  DESIGNS_VIEW: 'roomdecor.designsView',
 } as const;

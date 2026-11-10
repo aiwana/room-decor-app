@@ -8,7 +8,7 @@ import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 
 import { USE_MOCK } from '@/constants';
-import { COLORS, RADIUS, SPACING } from '@/constants/colors';
+import { COLORS, FONT, RADIUS, SPACING } from '@/constants/colors';
 
 interface NoticeProps {
   message: string;
@@ -39,5 +39,5 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     backgroundColor: COLORS.accentSoft,
   },
-  text: { flex: 1, fontSize: 12, color: COLORS.textSecondary, lineHeight: 17 },
+  text: { flex: 1, fontSize: 12, fontFamily: FONT.regular, color: COLORS.textSecondary, lineHeight: 17 },
 });

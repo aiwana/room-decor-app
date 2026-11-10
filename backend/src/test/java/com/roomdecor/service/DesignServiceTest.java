@@ -51,6 +51,34 @@ class DesignServiceTest {
     }
 
     @Test
+    void createDefaultsRoomTypeToOtherAndKeepsGivenType() {
+        RoomImage image = image(owner);
+        when(userRepository.findById(owner.getId())).thenReturn(Optional.of(owner));
+        when(roomImageRepository.findById(image.getId())).thenReturn(Optional.of(image));
+        when(designRepository.save(any(Design.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(designService.create(new CreateDesignRequest("A", image.getId()), owner.getId()).roomType())
+            .isEqualTo("other");
+        assertThat(designService.create(new CreateDesignRequest("B", image.getId(), "bedroom"), owner.getId()).roomType())
+            .isEqualTo("bedroom");
+    }
+
+    @Test
+    void updateChangesRoomTypeOnlyWhenGiven() {
+        Design design = design(owner);
+        when(designRepository.findById(design.getId())).thenReturn(Optional.of(design));
+
+        DesignDto changed = designService.update(design.getId(),
+            new UpdateDesignRequest(null, null, null, null, null, "kitchen"), owner.getId());
+        assertThat(changed.roomType()).isEqualTo("kitchen");
+
+        DesignDto kept = designService.update(design.getId(),
+            new UpdateDesignRequest("Tên khác", null, null, null, null), owner.getId());
+        assertThat(kept.roomType()).isEqualTo("kitchen");
+        assertThat(kept.name()).isEqualTo("Tên khác");
+    }
+
+    @Test
     void createWithSomeoneElsesRoomImageIsDenied() {
         RoomImage image = image(owner);
         when(userRepository.findById(stranger.getId())).thenReturn(Optional.of(stranger));

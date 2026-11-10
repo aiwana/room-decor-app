@@ -6,7 +6,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { COLORS } from '@/constants/colors';
+import { COLORS, FONT } from '@/constants/colors';
 import type { QuickAction } from '@/types';
 
 interface QuickActionItemProps {
@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  label: { marginTop: 8, fontSize: 12, color: COLORS.textPrimary, textAlign: 'center' },
+  label: { marginTop: 8, fontSize: 12, fontFamily: FONT.regular, color: COLORS.textPrimary, textAlign: 'center' },
 });
 
 export default QuickActionItem;

@@ -94,6 +94,26 @@ class AiServiceTest {
     }
 
     @Test
+    void scanStretchesThePlanToTheMeasuredRoom() {
+        RoomImage main = image(owner);
+        stubImages(main);
+        when(floorPlanRepository.findByRoomImageId(main.getId())).thenReturn(Optional.empty());
+        when(floorPlanService.createFromScan(eq(main), any(), any(), anyInt()))
+            .thenAnswer(inv -> floorPlan(main));
+
+        // The mock AI always answers 4 m x 4 m; the user measured 5 m x 3.5 m and a 2.9 m ceiling
+        aiService.scanRoom(new ScanRoomRequest(main.getId(), null, null, 5.0, 3.5, 2.9), owner.getId());
+
+        ArgumentCaptor<RoomVisionClient.RoomAnalysisResult> saved =
+            ArgumentCaptor.forClass(RoomVisionClient.RoomAnalysisResult.class);
+        verify(floorPlanService).createFromScan(eq(main), any(), saved.capture(), anyInt());
+        assertThat(saved.getValue().roomWidthMeters()).isEqualTo(5.0);
+        assertThat(saved.getValue().roomDepthMeters()).isEqualTo(3.5);
+        assertThat(saved.getValue().ceilingHeightMeters()).isEqualTo(2.9);
+        assertThat(saved.getValue().openings()).hasSize(1);
+    }
+
+    @Test
     void scanRejectsExtraPhotoOfAnotherUser() {
         RoomImage main = image(owner);
         RoomImage foreign = image(stranger);
@@ -246,6 +266,18 @@ class AiServiceTest {
             when(storageService.readImageBytes(image.getUrl())).thenReturn(new byte[] {1, 2, 3});
             when(storageService.imageMimeType(image.getUrl())).thenReturn("image/jpeg");
         }
+    }
+
+    @Test
+    void scanRefusesBlankRoomWithoutCallingAi() {
+        RoomImage blank = image(owner);
+        blank.setSource(RoomImage.SOURCE_BLANK);
+        when(roomImageRepository.findById(blank.getId())).thenReturn(Optional.of(blank));
+
+        assertThatThrownBy(() -> aiService.scanRoom(
+            new ScanRoomRequest(blank.getId(), null, null, null, null, null), owner.getId()))
+            .isInstanceOf(BadRequestException.class);
+        verify(storageService, never()).readImageBytes(anyString());
     }
 
     private static FloorPlan floorPlan(RoomImage image) {

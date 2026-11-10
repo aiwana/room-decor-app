@@ -22,7 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Button from '@/components/common/Button';
 import Chip from '@/components/common/Chip';
-import { COLORS, RADIUS, SPACING } from '@/constants/colors';
+import { COLORS, FONT, RADIUS, SPACING } from '@/constants/colors';
 import type { AiSuggestMode, IoniconName } from '@/types';
 
 /** value = gia tri cot style trong CSDL noi that, label = chu hien thi */
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  title: { fontSize: 18, fontWeight: 'bold', color: COLORS.textPrimary },
+  title: { fontSize: 18, fontFamily: FONT.bold, color: COLORS.textPrimary },
   body: { padding: SPACING.md, gap: 10 },
   mode: {
     flexDirection: 'row',
@@ -193,9 +193,9 @@ const styles = StyleSheet.create({
   modeSelected: { borderColor: COLORS.accent, backgroundColor: COLORS.accentSoft },
   modeDisabled: { opacity: 0.5 },
   modeText: { flex: 1 },
-  modeTitle: { fontSize: 15, fontWeight: '700', color: COLORS.textPrimary },
-  modeDetail: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
-  label: { fontSize: 13, fontWeight: '700', color: COLORS.textSecondary, marginTop: SPACING.sm },
+  modeTitle: { fontSize: 15, fontFamily: FONT.bold, color: COLORS.textPrimary },
+  modeDetail: { fontSize: 12, fontFamily: FONT.regular, color: COLORS.textSecondary, marginTop: 2 },
+  label: { fontSize: 13, fontFamily: FONT.bold, color: COLORS.textSecondary, marginTop: SPACING.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 8 },
   input: {
     minHeight: 64,
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     backgroundColor: COLORS.surfaceAlt,
     color: COLORS.textPrimary,
-    fontSize: 14,
+    fontSize: 15, fontFamily: FONT.regular,
     textAlignVertical: 'top',
   },
   footer: { paddingHorizontal: SPACING.md, paddingVertical: 12, borderTopWidth: 1, borderTopColor: COLORS.border },

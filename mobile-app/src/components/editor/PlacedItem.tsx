@@ -9,6 +9,8 @@
  *   - xoay 2 ngon: xoay
  * Keo/xoay/phong to xong -> bao ve man hinh cha (onChange) gia tri moi
  * theo don vi cua FurniturePlacement (x, y ti le 0..1; rotation do; scale).
+ * Dang keo -> onDragMove (neu co) bao vi tri tam thoi de man hinh cha hien khoang cach toi tuong
+ * (chi bao khi dich them >= 2px de khong goi JS moi khung hinh).
  *
  * Hien thi 2D tam thoi: o vuong mau cam + icon danh muc + ten
  * (chua co anh PNG/model 3D cua noi that). Ban 3D se thay phan hien thi nay.
@@ -20,7 +22,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 
-import { COLORS, RADIUS } from '@/constants/colors';
+import { COLORS, FONT, RADIUS } from '@/constants/colors';
 import { getCategoryIcon } from '@/constants/furniture';
 import type { Furniture, FurniturePlacement } from '@/types';
 
@@ -43,6 +45,8 @@ interface PlacedItemProps {
   selected: boolean;
   onSelect: (id: string) => void;
   onChange: (id: string, patch: PlacementPatch) => void;
+  /** Dang keo: vi tri tam (ti le 0..1), goc xoay (do), ti le phong to hien tai */
+  onDragMove?: (id: string, x: number, y: number, rotation: number, scale: number) => void;
 }
 
 /**
@@ -62,7 +66,19 @@ const clampWorklet = (v: number, min: number, max: number): number => {
   return Math.min(max, Math.max(min, v));
 };
 
-const PlacedItem: React.FC<PlacedItemProps> = ({ placement, furniture, frame, size, selected, onSelect, onChange }) => {
+/** Chi bao vi tri dang keo khi dich them it nhat chung nay (px) */
+const DRAG_REPORT_PX = 2;
+
+const PlacedItem: React.FC<PlacedItemProps> = ({
+  placement,
+  furniture,
+  frame,
+  size,
+  selected,
+  onSelect,
+  onChange,
+  onDragMove,
+}) => {
   const { w, h } = size ?? baseSizeOf(furniture, frame);
 
   // Gia tri dang hien thi (px / radian), cap nhat lien tuc khi dang keo
@@ -72,6 +88,8 @@ const PlacedItem: React.FC<PlacedItemProps> = ({ placement, furniture, frame, si
   const rotation = useSharedValue((placement.rotation * Math.PI) / 180);
   // Gia tri luc bat dau cu chi
   const start = useSharedValue({ cx: 0, cy: 0, scale: 1, rotation: 0 });
+  // Vi tri da bao lan cuoi cho onDragMove
+  const reported = useSharedValue({ cx: -1000, cy: -1000 });
 
   // Du lieu doi tu ben ngoai (AI goi y, nut xoay/phong to, khung anh doi kich thuoc) -> dong bo lai
   useEffect(() => {
@@ -105,12 +123,24 @@ const PlacedItem: React.FC<PlacedItemProps> = ({ placement, furniture, frame, si
     runOnJS(onSelect)(id);
   });
 
+  const report = (): void => {
+    'worklet';
+    if (!onDragMove) return;
+    if (Math.abs(cx.value - reported.value.cx) < DRAG_REPORT_PX && Math.abs(cy.value - reported.value.cy) < DRAG_REPORT_PX) {
+      return;
+    }
+    reported.value = { cx: cx.value, cy: cy.value };
+    runOnJS(onDragMove)(id, cx.value / frameW, cy.value / frameH, (rotation.value * 180) / Math.PI, scale.value);
+  };
+
+  // Keo tu do ca 2 truc (ngang + doc cung luc)
   const pan = Gesture.Pan()
     .onStart(saveStart)
     .onUpdate((e) => {
       // Tam mon do khong ra ngoai khung anh
       cx.value = clampWorklet(start.value.cx + e.translationX, 0, frameW);
       cy.value = clampWorklet(start.value.cy + e.translationY, 0, frameH);
+      report();
     })
     .onEnd(commit);
 
@@ -174,7 +204,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   selected: { borderColor: COLORS.textPrimary, borderWidth: 2.5, borderStyle: 'dashed' },
-  label: { fontSize: 10, fontWeight: '700', color: COLORS.textPrimary, marginTop: 2, textAlign: 'center' },
+  label: { fontSize: 12, fontFamily: FONT.bold, color: COLORS.textPrimary, marginTop: 2, textAlign: 'center' },
 });
 
 export default PlacedItem;

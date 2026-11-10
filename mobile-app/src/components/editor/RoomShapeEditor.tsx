@@ -7,11 +7,14 @@
  *   - cham 1 cua: doi loai, doi be rong, dich trai / phai, xoa
  *   - chieu cao tran
  * Bam "Lưu" -> tra ve tuong + cua da chuan hoa (goc tren trai = 0,0) cho man hinh cha gui len backend.
+ *
+ * Hien thi bang man hinh rieng app/(main)/room-shape.tsx (goi openRoomShapeEditor), KHONG dung <Modal>:
+ * tren Android, Modal la mot cua so rieng va doi khi chi hien lop toi ma noi dung bi dat sai kich thuoc
+ * (man hinh mo + khung lech). Man hinh trong Stack thi luon do kich thuoc dung.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -21,13 +24,13 @@ import {
   type LayoutChangeEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Circle, Line, Polygon, Text as SvgText } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Button from '@/components/common/Button';
 import { DOOR_COLOR, WINDOW_COLOR } from '@/components/design/FloorPlanBackground';
-import { COLORS, RADIUS, SPACING } from '@/constants/colors';
+import { COLORS, FONT, RADIUS, SPACING } from '@/constants/colors';
 import { getErrorMessage } from '@/services/api-error';
 import type { FloorPlan, Opening, Wall } from '@/types';
 import {
@@ -60,8 +63,7 @@ export interface RoomShapeResult {
   shift: Point;
 }
 
-interface RoomShapeEditorProps {
-  visible: boolean;
+export interface RoomShapeEditorProps {
   floorPlan: FloorPlan;
   onClose: () => void;
   onSave: (result: RoomShapeResult) => Promise<void>;
@@ -132,7 +134,15 @@ interface CornerHandleProps {
   onDragEnd: () => void;
 }
 
-const CornerHandle: React.FC<CornerHandleProps> = ({ index, point, view, selected, onDragStart, onDrag, onDragEnd }) => {
+const CornerHandle: React.FC<CornerHandleProps> = ({
+  index,
+  point,
+  view,
+  selected,
+  onDragStart,
+  onDrag,
+  onDragEnd,
+}) => {
   const gesture = useMemo(
     () =>
       Gesture.Exclusive(
@@ -167,7 +177,7 @@ const CornerHandle: React.FC<CornerHandleProps> = ({ index, point, view, selecte
 
 /* ------------------------------- Man hinh chinh ------------------------------- */
 
-const RoomShapeEditor: React.FC<RoomShapeEditorProps> = ({ visible, floorPlan, onClose, onSave }) => {
+const RoomShapeEditor: React.FC<RoomShapeEditorProps> = ({ floorPlan, onClose, onSave }) => {
   const [points, setPoints] = useState<Point[]>([]);
   const [openings, setOpenings] = useState<WallOpening[]>([]);
   const [ceiling, setCeiling] = useState('');
@@ -185,7 +195,6 @@ const RoomShapeEditor: React.FC<RoomShapeEditorProps> = ({ visible, floorPlan, o
 
   // Mo len: lay hinh dang phong hien tai
   useEffect(() => {
-    if (!visible) return;
     const poly = floorPlanPolygon(floorPlan);
     setPoints(poly);
     setOpenings(openingsToWallOpenings(floorPlan.openings ?? [], poly));
@@ -193,12 +202,12 @@ const RoomShapeEditor: React.FC<RoomShapeEditorProps> = ({ visible, floorPlan, o
     setSelection(null);
     setError(null);
     setView(null);
-  }, [visible, floorPlan]);
+  }, [floorPlan]);
 
   // Co kich thuoc khung ve -> canh cho vua man hinh (1 lan, hoac khi bam "Vừa màn hình")
   useEffect(() => {
-    if (visible && !view && canvas.w > 0 && points.length >= 3) setView(fitView(points, canvas.w, canvas.h));
-  }, [visible, view, canvas, points]);
+    if (!view && canvas.w > 0 && points.length >= 3) setView(fitView(points, canvas.w, canvas.h));
+  }, [view, canvas, points]);
 
   const select = (next: Selection): void => {
     setSelection(next);
@@ -341,224 +350,225 @@ const RoomShapeEditor: React.FC<RoomShapeEditorProps> = ({ visible, floorPlan, o
   };
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      {/* Modal la cua so rieng tren Android -> can GestureHandlerRootView de keo goc duoc */}
-      <GestureHandlerRootView style={styles.flex}>
-        <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-          <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <View style={styles.header}>
-              <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button">
-                <Text style={styles.headerCancel}>Huỷ</Text>
-              </Pressable>
-              <Text style={styles.title}>Sửa phòng</Text>
-              <Pressable onPress={(): void => void handleSave()} disabled={saving} hitSlop={10} accessibilityRole="button">
-                <Text style={[styles.headerSave, saving && styles.headerSaveDisabled]}>{saving ? 'Đang lưu...' : 'Lưu'}</Text>
-              </Pressable>
-            </View>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.header}>
+          <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button">
+            <Text style={styles.headerCancel}>Huỷ</Text>
+          </Pressable>
+          <Text style={styles.title}>Sửa phòng</Text>
+          <Pressable onPress={(): void => void handleSave()} disabled={saving} hitSlop={10} accessibilityRole="button">
+            <Text style={[styles.headerSave, saving && styles.headerSaveDisabled]}>
+              {saving ? 'Đang lưu...' : 'Lưu'}
+            </Text>
+          </Pressable>
+        </View>
 
-            {/* ===== Khung ve ===== */}
-            <View style={styles.canvas} onLayout={onCanvasLayout}>
-              {view ? (
-                <>
-                  <Svg width={canvas.w} height={canvas.h} style={StyleSheet.absoluteFill}>
-                    <Polygon
-                      points={points.map((p) => `${toPx(p).x},${toPx(p).y}`).join(' ')}
-                      fill="rgba(230,126,34,0.18)"
-                      onPress={(): void => select(null)}
-                    />
-                    {points.map((_, i) => {
-                      const [a, b] = wallAt(points, i).map(toPx);
-                      const isSel = selection?.kind === 'wall' && selection.index === i;
-                      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-                      return (
-                        <React.Fragment key={`w${i}`}>
-                          <Line
-                            x1={a.x}
-                            y1={a.y}
-                            x2={b.x}
-                            y2={b.y}
-                            stroke={isSel ? COLORS.accent : COLORS.textPrimary}
-                            strokeWidth={isSel ? 6 : 4}
-                            strokeLinecap="round"
-                          />
-                          {/* Vung cham rong hon net ve de de bam trung tuong */}
-                          <Line
-                            x1={a.x}
-                            y1={a.y}
-                            x2={b.x}
-                            y2={b.y}
-                            stroke="rgba(0,0,0,0.01)"
-                            strokeWidth={28}
-                            onPress={(): void => select({ kind: 'wall', index: i })}
-                          />
-                          <SvgText
-                            x={mid.x}
-                            y={mid.y - 8}
-                            fontSize={12}
-                            fontWeight="bold"
-                            fill={isSel ? COLORS.accent : COLORS.textSecondary}
-                            textAnchor="middle"
-                          >
-                            {`${wallLength(points, i).toFixed(2)} m`}
-                          </SvgText>
-                        </React.Fragment>
-                      );
-                    })}
-                    {openings.map((o, i) => {
-                      const line = wallOpeningToOpening(o, points);
-                      const a = toPx({ x: line.x1, y: line.y1 });
-                      const b = toPx({ x: line.x2, y: line.y2 });
-                      const isSel = selection?.kind === 'opening' && selection.index === i;
-                      const c = toPx(wallOpeningCenter(o, points));
-                      return (
-                        <React.Fragment key={`o${i}`}>
-                          <Line
-                            x1={a.x}
-                            y1={a.y}
-                            x2={b.x}
-                            y2={b.y}
-                            stroke={o.type === 'door' ? DOOR_COLOR : WINDOW_COLOR}
-                            strokeWidth={isSel ? 12 : 9}
-                            onPress={(): void => select({ kind: 'opening', index: i })}
-                          />
-                          {isSel ? <Circle cx={c.x} cy={c.y} r={4} fill={COLORS.textPrimary} /> : null}
-                        </React.Fragment>
-                      );
-                    })}
-                  </Svg>
-                  {points.map((p, i) => (
-                    <CornerHandle
-                      key={`c${i}`}
-                      index={i}
-                      point={p}
-                      view={view}
-                      selected={selection?.kind === 'corner' && selection.index === i}
-                      onDragStart={onDragStart}
-                      onDrag={onDrag}
-                      onDragEnd={onDragEnd}
-                    />
-                  ))}
-                  <Pressable
-                    style={styles.fitBtn}
-                    onPress={(): void => setView(fitView(points, canvas.w, canvas.h))}
-                    accessibilityRole="button"
-                    accessibilityLabel="Vừa màn hình"
-                  >
-                    <Ionicons name="scan-outline" size={16} color={COLORS.textPrimary} />
-                    <Text style={styles.fitText}>Vừa màn hình</Text>
-                  </Pressable>
-                  <View style={styles.legend} pointerEvents="none">
-                    <View style={[styles.legendDot, { backgroundColor: DOOR_COLOR }]} />
-                    <Text style={styles.legendText}>Cửa ra vào</Text>
-                    <View style={[styles.legendDot, { backgroundColor: WINDOW_COLOR }]} />
-                    <Text style={styles.legendText}>Cửa sổ</Text>
-                  </View>
-                </>
-              ) : null}
-            </View>
-
-            {/* ===== Bang sua theo doi tuong dang chon ===== */}
-            <View style={styles.panel}>
-              {selection?.kind === 'wall' ? (
-                <>
-                  <Text style={styles.panelTitle}>Tường {selection.index + 1}</Text>
-                  <View style={styles.inputRow}>
-                    <View style={styles.inputWrap}>
-                      <TextInput
-                        style={styles.input}
-                        value={lengthInput}
-                        onChangeText={setLengthInput}
-                        keyboardType="decimal-pad"
-                        selectTextOnFocus
-                        accessibilityLabel="Chiều dài tường"
-                        onSubmitEditing={applyLength}
+        {/* ===== Khung ve ===== */}
+        <View style={styles.canvas} onLayout={onCanvasLayout}>
+          {view ? (
+            <>
+              <Svg width={canvas.w} height={canvas.h} style={StyleSheet.absoluteFill}>
+                <Polygon
+                  points={points.map((p) => `${toPx(p).x},${toPx(p).y}`).join(' ')}
+                  fill="rgba(230,126,34,0.18)"
+                  onPress={(): void => select(null)}
+                />
+                {points.map((_, i) => {
+                  const [a, b] = wallAt(points, i).map(toPx);
+                  const isSel = selection?.kind === 'wall' && selection.index === i;
+                  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+                  return (
+                    <React.Fragment key={`w${i}`}>
+                      <Line
+                        x1={a.x}
+                        y1={a.y}
+                        x2={b.x}
+                        y2={b.y}
+                        stroke={isSel ? COLORS.accent : COLORS.textPrimary}
+                        strokeWidth={isSel ? 6 : 4}
+                        strokeLinecap="round"
                       />
-                      <Text style={styles.unit}>m</Text>
-                    </View>
-                    <Button title="Đặt chiều dài" onPress={applyLength} style={styles.inlineBtn} />
-                  </View>
-                  <View style={styles.actionRow}>
-                    <SmallAction icon="git-commit-outline" label="Thêm góc" onPress={addCorner} />
-                    <SmallAction icon="enter-outline" label="Thêm cửa" onPress={(): void => addOpening('door')} />
-                    <SmallAction icon="browsers-outline" label="Thêm cửa sổ" onPress={(): void => addOpening('window')} />
-                  </View>
-                </>
-              ) : selection?.kind === 'corner' ? (
-                <>
-                  <Text style={styles.panelTitle}>Góc {selection.index + 1}</Text>
-                  <Text style={styles.hint}>Kéo chấm tròn để di chuyển góc. Góc tự thẳng hàng với góc bên cạnh khi kéo gần.</Text>
-                  <View style={styles.actionRow}>
-                    <SmallAction
-                      icon="trash-outline"
-                      label={points.length > 3 ? 'Xoá góc' : 'Cần ít nhất 3 góc'}
-                      danger
-                      disabled={points.length <= 3}
-                      onPress={deleteCorner}
-                    />
-                  </View>
-                </>
-              ) : selectedOpening ? (
-                <>
-                  <View style={styles.typeRow}>
-                    {(['door', 'window'] as const).map((type) => (
-                      <Pressable
-                        key={type}
-                        style={[styles.typeChip, selectedOpening.type === type && styles.typeChipActive]}
-                        onPress={(): void => patchOpening(() => ({ type }))}
-                        accessibilityRole="button"
+                      {/* Vung cham rong hon net ve de de bam trung tuong */}
+                      <Line
+                        x1={a.x}
+                        y1={a.y}
+                        x2={b.x}
+                        y2={b.y}
+                        stroke="rgba(0,0,0,0.01)"
+                        strokeWidth={28}
+                        onPress={(): void => select({ kind: 'wall', index: i })}
+                      />
+                      <SvgText
+                        x={mid.x}
+                        y={mid.y - 8}
+                        fontSize={12}
+                        fontWeight="bold"
+                        fill={isSel ? COLORS.accent : COLORS.textSecondary}
+                        textAnchor="middle"
                       >
-                        <Text style={styles.typeChipText}>{type === 'door' ? 'Cửa ra vào' : 'Cửa sổ'}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  <View style={styles.inputRow}>
-                    <View style={styles.inputWrap}>
-                      <TextInput
-                        style={styles.input}
-                        value={widthInput}
-                        onChangeText={setWidthInput}
-                        keyboardType="decimal-pad"
-                        selectTextOnFocus
-                        accessibilityLabel="Bề rộng cửa"
-                        onSubmitEditing={applyOpeningWidth}
+                        {`${wallLength(points, i).toFixed(2)} m`}
+                      </SvgText>
+                    </React.Fragment>
+                  );
+                })}
+                {openings.map((o, i) => {
+                  const line = wallOpeningToOpening(o, points);
+                  const a = toPx({ x: line.x1, y: line.y1 });
+                  const b = toPx({ x: line.x2, y: line.y2 });
+                  const isSel = selection?.kind === 'opening' && selection.index === i;
+                  const c = toPx(wallOpeningCenter(o, points));
+                  return (
+                    <React.Fragment key={`o${i}`}>
+                      <Line
+                        x1={a.x}
+                        y1={a.y}
+                        x2={b.x}
+                        y2={b.y}
+                        stroke={o.type === 'door' ? DOOR_COLOR : WINDOW_COLOR}
+                        strokeWidth={isSel ? 12 : 9}
+                        onPress={(): void => select({ kind: 'opening', index: i })}
                       />
-                      <Text style={styles.unit}>m</Text>
-                    </View>
-                    <Button title="Đặt bề rộng" onPress={applyOpeningWidth} style={styles.inlineBtn} />
-                  </View>
-                  <View style={styles.actionRow}>
-                    <SmallAction icon="chevron-back" label="Dịch 10cm" onPress={(): void => moveOpening(-1)} />
-                    <SmallAction icon="chevron-forward" label="Dịch 10cm" onPress={(): void => moveOpening(1)} />
-                    <SmallAction icon="trash-outline" label="Xoá cửa" danger onPress={deleteOpening} />
-                  </View>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.hint}>
-                    Kéo chấm tròn để sửa góc phòng. Chạm vào 1 bức tường để nhập chiều dài thật hoặc thêm cửa; chạm vào cửa để sửa.
-                  </Text>
-                  <View style={styles.inputRow}>
-                    <Text style={styles.label}>Chiều cao trần</Text>
-                    <View style={styles.inputWrap}>
-                      <TextInput
-                        style={styles.input}
-                        value={ceiling}
-                        onChangeText={setCeiling}
-                        keyboardType="decimal-pad"
-                        selectTextOnFocus
-                        accessibilityLabel="Chiều cao trần"
-                      />
-                      <Text style={styles.unit}>m</Text>
-                    </View>
-                  </View>
-                </>
-              )}
-              {error ? <Text style={styles.error}>{error}</Text> : null}
-            </View>
-          </KeyboardAvoidingView>
-        </SafeAreaView>
-      </GestureHandlerRootView>
-    </Modal>
+                      {isSel ? <Circle cx={c.x} cy={c.y} r={4} fill={COLORS.textPrimary} /> : null}
+                    </React.Fragment>
+                  );
+                })}
+              </Svg>
+              {points.map((p, i) => (
+                <CornerHandle
+                  key={`c${i}`}
+                  index={i}
+                  point={p}
+                  view={view}
+                  selected={selection?.kind === 'corner' && selection.index === i}
+                  onDragStart={onDragStart}
+                  onDrag={onDrag}
+                  onDragEnd={onDragEnd}
+                />
+              ))}
+              <Pressable
+                style={styles.fitBtn}
+                hitSlop={6}
+                onPress={(): void => setView(fitView(points, canvas.w, canvas.h))}
+                accessibilityRole="button"
+                accessibilityLabel="Vừa màn hình"
+              >
+                <Ionicons name="scan-outline" size={16} color={COLORS.textPrimary} />
+                <Text style={styles.fitText}>Vừa màn hình</Text>
+              </Pressable>
+              <View style={styles.legend} pointerEvents="none">
+                <View style={[styles.legendDot, { backgroundColor: DOOR_COLOR }]} />
+                <Text style={styles.legendText}>Cửa ra vào</Text>
+                <View style={[styles.legendDot, { backgroundColor: WINDOW_COLOR }]} />
+                <Text style={styles.legendText}>Cửa sổ</Text>
+              </View>
+            </>
+          ) : null}
+        </View>
+
+        {/* ===== Bang sua theo doi tuong dang chon ===== */}
+        <View style={styles.panel}>
+          {selection?.kind === 'wall' ? (
+            <>
+              <Text style={styles.panelTitle}>Tường {selection.index + 1}</Text>
+              <View style={styles.inputRow}>
+                <View style={styles.inputWrap}>
+                  <TextInput
+                    style={styles.input}
+                    value={lengthInput}
+                    onChangeText={setLengthInput}
+                    keyboardType="decimal-pad"
+                    selectTextOnFocus
+                    accessibilityLabel="Chiều dài tường"
+                    onSubmitEditing={applyLength}
+                  />
+                  <Text style={styles.unit}>m</Text>
+                </View>
+                <Button title="Đặt chiều dài" onPress={applyLength} style={styles.inlineBtn} />
+              </View>
+              <View style={styles.actionRow}>
+                <SmallAction icon="git-commit-outline" label="Thêm góc" onPress={addCorner} />
+                <SmallAction icon="enter-outline" label="Thêm cửa" onPress={(): void => addOpening('door')} />
+                <SmallAction icon="browsers-outline" label="Thêm cửa sổ" onPress={(): void => addOpening('window')} />
+              </View>
+            </>
+          ) : selection?.kind === 'corner' ? (
+            <>
+              <Text style={styles.panelTitle}>Góc {selection.index + 1}</Text>
+              <Text style={styles.hint}>
+                Kéo chấm tròn để di chuyển góc. Góc tự thẳng hàng với góc bên cạnh khi kéo gần.
+              </Text>
+              <View style={styles.actionRow}>
+                <SmallAction
+                  icon="trash-outline"
+                  label={points.length > 3 ? 'Xoá góc' : 'Cần ít nhất 3 góc'}
+                  danger
+                  disabled={points.length <= 3}
+                  onPress={deleteCorner}
+                />
+              </View>
+            </>
+          ) : selectedOpening ? (
+            <>
+              <View style={styles.typeRow}>
+                {(['door', 'window'] as const).map((type) => (
+                  <Pressable
+                    key={type}
+                    style={[styles.typeChip, selectedOpening.type === type && styles.typeChipActive]}
+                    onPress={(): void => patchOpening(() => ({ type }))}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.typeChipText}>{type === 'door' ? 'Cửa ra vào' : 'Cửa sổ'}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View style={styles.inputRow}>
+                <View style={styles.inputWrap}>
+                  <TextInput
+                    style={styles.input}
+                    value={widthInput}
+                    onChangeText={setWidthInput}
+                    keyboardType="decimal-pad"
+                    selectTextOnFocus
+                    accessibilityLabel="Bề rộng cửa"
+                    onSubmitEditing={applyOpeningWidth}
+                  />
+                  <Text style={styles.unit}>m</Text>
+                </View>
+                <Button title="Đặt bề rộng" onPress={applyOpeningWidth} style={styles.inlineBtn} />
+              </View>
+              <View style={styles.actionRow}>
+                <SmallAction icon="chevron-back" label="Dịch 10cm" onPress={(): void => moveOpening(-1)} />
+                <SmallAction icon="chevron-forward" label="Dịch 10cm" onPress={(): void => moveOpening(1)} />
+                <SmallAction icon="trash-outline" label="Xoá cửa" danger onPress={deleteOpening} />
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={styles.hint}>
+                Kéo chấm tròn để sửa góc phòng. Chạm vào 1 bức tường để nhập chiều dài thật hoặc thêm cửa; chạm vào cửa
+                để sửa.
+              </Text>
+              <View style={styles.inputRow}>
+                <Text style={styles.label}>Chiều cao trần</Text>
+                <View style={styles.inputWrap}>
+                  <TextInput
+                    style={styles.input}
+                    value={ceiling}
+                    onChangeText={setCeiling}
+                    keyboardType="decimal-pad"
+                    selectTextOnFocus
+                    accessibilityLabel="Chiều cao trần"
+                  />
+                  <Text style={styles.unit}>m</Text>
+                </View>
+              </View>
+            </>
+          )}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
@@ -578,7 +588,7 @@ const SmallAction: React.FC<SmallActionProps> = ({ icon, label, onPress, danger,
     accessibilityRole="button"
     accessibilityLabel={label}
   >
-    <Ionicons name={icon} size={18} color={danger ? COLORS.danger : COLORS.textPrimary} />
+    <Ionicons name={icon} size={18} color={danger ? COLORS.dangerText : COLORS.textPrimary} />
     <Text style={[styles.actionText, danger && styles.actionDanger]}>{label}</Text>
   </Pressable>
 );
@@ -595,9 +605,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  headerCancel: { fontSize: 15, color: COLORS.textSecondary },
-  title: { fontSize: 17, fontWeight: '700', color: COLORS.textPrimary },
-  headerSave: { fontSize: 15, fontWeight: '700', color: COLORS.accent },
+  headerCancel: { fontSize: 15, fontFamily: FONT.regular, color: COLORS.textSecondary },
+  title: { fontSize: 18, fontFamily: FONT.bold, color: COLORS.textPrimary },
+  headerSave: { fontSize: 15, fontFamily: FONT.bold, color: COLORS.accent },
   headerSaveDisabled: { color: COLORS.inactive },
   canvas: { flex: 1, backgroundColor: COLORS.surfaceAlt, overflow: 'hidden' },
   handle: {
@@ -612,7 +622,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   handleSelected: { backgroundColor: COLORS.accent, borderColor: COLORS.textPrimary },
-  handleText: { fontSize: 11, fontWeight: '700', color: COLORS.textPrimary },
+  handleText: { fontSize: 12, fontFamily: FONT.bold, color: COLORS.textPrimary },
   fitBtn: {
     position: 'absolute',
     right: 10,
@@ -625,10 +635,10 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.overlay,
   },
-  fitText: { fontSize: 12, color: COLORS.textPrimary, fontWeight: '600' },
+  fitText: { fontSize: 12, color: COLORS.textPrimary, fontFamily: FONT.semibold },
   legend: { position: 'absolute', left: 10, bottom: 10, flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 14, height: 5, borderRadius: 2 },
-  legendText: { fontSize: 11, color: COLORS.textSecondary, marginRight: 8 },
+  legendText: { fontSize: 12, fontFamily: FONT.regular, color: COLORS.textSecondary, marginRight: 8 },
   panel: {
     padding: SPACING.md,
     gap: SPACING.sm,
@@ -636,9 +646,9 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.border,
     backgroundColor: COLORS.surface,
   },
-  panelTitle: { fontSize: 15, fontWeight: '700', color: COLORS.textPrimary },
-  hint: { fontSize: 12, lineHeight: 18, color: COLORS.textSecondary },
-  label: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
+  panelTitle: { fontSize: 15, fontFamily: FONT.bold, color: COLORS.textPrimary },
+  hint: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 18, color: COLORS.textSecondary },
+  label: { fontSize: 13, fontFamily: FONT.semibold, color: COLORS.textSecondary },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   inputWrap: {
     flex: 1,
@@ -651,15 +661,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  input: { flex: 1, fontSize: 16, color: COLORS.textPrimary, paddingVertical: 0 },
-  unit: { fontSize: 13, color: COLORS.textSecondary, marginLeft: 4 },
+  input: { flex: 1, fontSize: 15, fontFamily: FONT.regular, color: COLORS.textPrimary, paddingVertical: 0 },
+  unit: { fontSize: 13, fontFamily: FONT.regular, color: COLORS.textSecondary, marginLeft: 4 },
   inlineBtn: { height: 44, paddingHorizontal: SPACING.md },
   actionRow: { flexDirection: 'row', gap: SPACING.sm },
-  action: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: RADIUS.sm, backgroundColor: COLORS.surfaceAlt },
+  action: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.surfaceAlt,
+  },
   actionPressed: { opacity: 0.7 },
   actionDisabled: { opacity: 0.4 },
-  actionText: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2, textAlign: 'center' },
-  actionDanger: { color: COLORS.danger },
+  actionText: {
+    fontSize: 12,
+    fontFamily: FONT.regular,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  actionDanger: { color: COLORS.dangerText },
   typeRow: { flexDirection: 'row', gap: SPACING.sm },
   typeChip: {
     flex: 1,
@@ -670,8 +692,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   typeChipActive: { borderColor: COLORS.accent, backgroundColor: COLORS.accentSoft },
-  typeChipText: { fontSize: 13, color: COLORS.textPrimary, fontWeight: '600' },
-  error: { fontSize: 12, lineHeight: 17, color: COLORS.danger },
+  typeChipText: { fontSize: 13, color: COLORS.textPrimary, fontFamily: FONT.semibold },
+  error: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 17, color: COLORS.dangerText },
 });
 
 export default RoomShapeEditor;

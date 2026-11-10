@@ -37,6 +37,8 @@ interface View3DProps {
   skirtingMaterial?: string;
   /** Danh sach vat lieu (de lay mau + anh van) */
   materials?: Material[];
+  /** Nhan anh chup khung 3D (data:image/jpeg;base64,...) de lam anh nho o man "Của tôi" */
+  onSnapshot?: (dataUrl: string) => void;
 }
 
 interface TextureSpec {
@@ -59,7 +61,7 @@ const buildScene = ({
   wallMaterial,
   skirtingMaterial,
   materials,
-}: View3DProps) => ({
+}: Omit<View3DProps, 'onSnapshot'>) => ({
   background: COLORS.background,
   room: { width: floorPlan.roomWidth, depth: floorPlan.roomDepth, height: floorPlan.ceilingHeight },
   floor: floorPlanPolygon(floorPlan),
@@ -107,7 +109,8 @@ window.__SCENE__=${JSON.stringify(scene).replace(/</g, '\\u003c')};</script>
 </body></html>`;
 
 const View3D: React.FC<View3DProps> = (props) => {
-  const { floorPlan, placements, furnitureById, floorMaterial, wallMaterial, skirtingMaterial, materials } = props;
+  const { floorPlan, placements, furnitureById, floorMaterial, wallMaterial, skirtingMaterial, materials, onSnapshot } =
+    props;
   const html = useMemo(
     () =>
       buildView3DHtml(
@@ -128,6 +131,17 @@ const View3D: React.FC<View3DProps> = (props) => {
         // User-Agent rieng (khong giong trinh duyet): ngrok ban mien phi khong chen trang canh bao
         // khi WebView tai texture tu backend public
         userAgent="RoomDecorApp/1.0"
+        onMessage={(e): void => {
+          if (!onSnapshot) return;
+          try {
+            const msg = JSON.parse(e.nativeEvent.data) as { type?: string; data?: unknown };
+            if (msg.type === 'snapshot' && typeof msg.data === 'string' && msg.data.startsWith('data:image/')) {
+              onSnapshot(msg.data);
+            }
+          } catch {
+            // tin nhan la -> bo qua
+          }
+        }}
       />
     </View>
   );

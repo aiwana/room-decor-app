@@ -112,6 +112,8 @@ export interface Design {
   /** Co the null ngay sau khi tao (backend chua dien) */
   createdAt: string | null;
   updatedAt: string | null;
+  /** Loai phong (xem constants/room-types.ts); backend cu chua co -> "other" */
+  roomType?: string | null;
 }
 
 /** RoomImage (POST /api/room-images/upload) */
@@ -159,6 +161,8 @@ export interface FloorPlan {
   description?: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  /** "photo" = AI quet tu anh; "blank" = phong trong / phong mau tu tao (khong quet lai duoc). Ban cu chua co. */
+  source?: 'photo' | 'blank';
 }
 
 /** ScanRoomResponse */
@@ -187,10 +191,30 @@ export type AiSuggestMode = 'rearrange' | 'add';
  *  - roomImageUri: anh phong tren may (hien nhanh, khong can tai lai tu may chu)
  *  - placements  : vi tri do (luu tren may va gui len PUT /api/designs/{id})
  */
+/**
+ * Tom tat thiet ke luu tren may de ve the o man "Của tôi" (khong can tai mat bang / noi that):
+ * ghi lai moi khi mo / sua trong trinh chinh sua.
+ */
+export interface DesignSummary {
+  /** Cac goc san (met) */
+  polygon: { x: number; y: number }[];
+  roomWidth: number;
+  roomDepth: number;
+  /** Noi that: tam (met), kich thuoc (met), goc xoay (do) */
+  items: { x: number; y: number; w: number; d: number; rotation: number }[];
+  floorArea: number;
+  quoteTotal: number;
+  source: 'photo' | 'blank';
+}
+
 export interface DesignDetail extends Design {
   createdAt: string;
   updatedAt: string;
   roomImageUri: string | null;
+  roomType: string;
+  /** Anh chup khung 3D (file tren may), co sau khi mo tab 3D */
+  thumbnailUri: string | null;
+  summary: DesignSummary | null;
 }
 
 /** Nut tat tren Home */

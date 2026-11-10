@@ -16,7 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import Button from '@/components/common/Button';
-import { COLORS, RADIUS, SPACING } from '@/constants/colors';
+import { COLORS, FONT, RADIUS, SPACING } from '@/constants/colors';
 import { getErrorMessage } from '@/services/api-error';
 import type { FloorPlan } from '@/types';
 
@@ -182,12 +182,12 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { fontSize: 18, fontWeight: '700', color: COLORS.textPrimary },
-  hint: { fontSize: 12, lineHeight: 18, color: COLORS.textSecondary },
+  title: { fontSize: 18, fontFamily: FONT.bold, color: COLORS.textPrimary },
+  hint: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 18, color: COLORS.textSecondary },
   row: { flexDirection: 'row', gap: SPACING.md },
   field: { gap: 6 },
   fieldGrow: { flex: 1 },
-  label: { fontSize: 12, fontWeight: '600', color: COLORS.textSecondary },
+  label: { fontSize: 12, fontFamily: FONT.semibold, color: COLORS.textSecondary },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -198,9 +198,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  input: { flex: 1, fontSize: 16, color: COLORS.textPrimary, paddingVertical: 0 },
-  unit: { fontSize: 13, color: COLORS.textSecondary, marginLeft: 4 },
-  error: { fontSize: 12, lineHeight: 17, color: COLORS.danger },
+  input: { flex: 1, fontSize: 15, fontFamily: FONT.regular, color: COLORS.textPrimary, paddingVertical: 0 },
+  unit: { fontSize: 13, fontFamily: FONT.regular, color: COLORS.textSecondary, marginLeft: 4 },
+  error: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 17, color: COLORS.danger },
   actions: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.xs },
   action: { flex: 1 },
 });

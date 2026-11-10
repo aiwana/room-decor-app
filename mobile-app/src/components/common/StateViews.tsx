@@ -6,7 +6,7 @@ import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { COLORS, SPACING } from '@/constants/colors';
+import { COLORS, FONT, SPACING } from '@/constants/colors';
 import type { IoniconName } from '@/types';
 
 import Button from './Button';
@@ -66,13 +66,13 @@ const styles = StyleSheet.create({
   title: {
     marginTop: SPACING.md,
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: FONT.bold,
     color: COLORS.textPrimary,
     textAlign: 'center',
   },
   message: {
     marginTop: SPACING.sm,
-    fontSize: 14,
+    fontSize: 15, fontFamily: FONT.regular,
     color: COLORS.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
