@@ -17,6 +17,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -184,6 +185,9 @@ const RoomShapeEditor: React.FC<RoomShapeEditorProps> = ({ floorPlan, onClose, o
   const [selection, setSelection] = useState<Selection>(null);
   const [lengthInput, setLengthInput] = useState('');
   const [widthInput, setWidthInput] = useState('');
+  // Nhap kich thuoc toan phong (dai x rong) de scale polygon
+  const [roomLengthInput, setRoomLengthInput] = useState('');
+  const [roomWidthInput, setRoomWidthInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [canvas, setCanvas] = useState({ w: 0, h: 0 });
@@ -272,6 +276,52 @@ const RoomShapeEditor: React.FC<RoomShapeEditorProps> = ({ floorPlan, onClose, o
     setOpenings((prev) => reattachOpenings(prev, points, next));
     setPoints(next);
     setSelection(null);
+  };
+
+  /* ---------- Scale toan phong theo chieu dai / rong nhap vao ---------- */
+  const applyRoomSize = (): void => {
+    const { minX, minY, maxX, maxY } = polygonBounds(points);
+    const curW = maxX - minX;
+    const curD = maxY - minY;
+    if (curW < 1e-6 || curD < 1e-6) return;
+
+    const newLen = parseMeters(roomLengthInput);
+    const newWid = parseMeters(roomWidthInput);
+    if (newLen === null && newWid === null) {
+      setError('Nhập ít nhất một chiều dài hoặc chiều rộng.');
+      return;
+    }
+    // Chieu dai = canh dai hon, chieu rong = canh ngan hon (giong ScanCorrection)
+    const longCur  = Math.max(curW, curD);
+    const shortCur = Math.min(curW, curD);
+    let sx = 1; let sy = 1;
+    if (newLen !== null && newLen >= MIN_SIDE && newLen <= MAX_SIDE &&
+        newWid !== null && newWid >= MIN_SIDE && newWid <= MAX_SIDE) {
+      const l = Math.max(newLen, newWid);
+      const s = Math.min(newLen, newWid);
+      sx = curW >= curD ? l / curW : s / curW;
+      sy = curW >= curD ? s / curD : l / curD;
+    } else if (newLen !== null && newLen >= MIN_SIDE && newLen <= MAX_SIDE) {
+      const k = newLen / longCur;
+      sx = k; sy = k;
+    } else if (newWid !== null && newWid >= MIN_SIDE && newWid <= MAX_SIDE) {
+      const k = newWid / shortCur;
+      sx = k; sy = k;
+    } else {
+      setError(`Kích thước phải từ ${MIN_SIDE} đến ${MAX_SIDE} m.`);
+      return;
+    }
+    // Scale quanh goc tren trai (minX, minY)
+    const scaled = points.map((p) => ({
+      x: round2(minX + (p.x - minX) * sx),
+      y: round2(minY + (p.y - minY) * sy),
+    }));
+    setOpenings((prev) => reattachOpenings(prev, points, scaled));
+    setPoints(scaled);
+    setRoomLengthInput('');
+    setRoomWidthInput('');
+    setError(null);
+    setView(null); // fit lai man hinh
   };
 
   /* ---------- Thao tac tren cua ---------- */
@@ -364,8 +414,9 @@ const RoomShapeEditor: React.FC<RoomShapeEditorProps> = ({ floorPlan, onClose, o
           </Pressable>
         </View>
 
-        {/* ===== Khung ve ===== */}
-        <View style={styles.canvas} onLayout={onCanvasLayout}>
+        {/* Canvas chiếm phần còn lại sau khi trừ panel cố định */}
+        <View style={styles.canvasWrap}>
+          <View style={styles.canvas} onLayout={onCanvasLayout}>
           {view ? (
             <>
               <Svg width={canvas.w} height={canvas.h} style={StyleSheet.absoluteFill}>
@@ -465,9 +516,15 @@ const RoomShapeEditor: React.FC<RoomShapeEditorProps> = ({ floorPlan, onClose, o
             </>
           ) : null}
         </View>
+        </View>{/* canvasWrap */}
 
         {/* ===== Bang sua theo doi tuong dang chon ===== */}
-        <View style={styles.panel}>
+        <ScrollView
+          style={styles.panel}
+          contentContainerStyle={styles.panelContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           {selection?.kind === 'wall' ? (
             <>
               <Text style={styles.panelTitle}>Tường {selection.index + 1}</Text>
@@ -546,27 +603,65 @@ const RoomShapeEditor: React.FC<RoomShapeEditorProps> = ({ floorPlan, onClose, o
           ) : (
             <>
               <Text style={styles.hint}>
-                Kéo chấm tròn để sửa góc phòng. Chạm vào 1 bức tường để nhập chiều dài thật hoặc thêm cửa; chạm vào cửa
-                để sửa.
+                Kéo chấm tròn để sửa góc. Chạm tường để nhập chiều dài hoặc thêm cửa.
               </Text>
-              <View style={styles.inputRow}>
-                <Text style={styles.label}>Chiều cao trần</Text>
-                <View style={styles.inputWrap}>
-                  <TextInput
-                    style={styles.input}
-                    value={ceiling}
-                    onChangeText={setCeiling}
-                    keyboardType="decimal-pad"
-                    selectTextOnFocus
-                    accessibilityLabel="Chiều cao trần"
-                  />
-                  <Text style={styles.unit}>m</Text>
+              <View style={styles.dimRow}>
+                <View style={styles.dimField}>
+                  <Text style={styles.label}>Dài (m)</Text>
+                  <View style={styles.inputWrap}>
+                    <TextInput
+                      style={styles.input}
+                      value={roomLengthInput}
+                      onChangeText={setRoomLengthInput}
+                      keyboardType="decimal-pad"
+                      selectTextOnFocus
+                      placeholder={fmt(Math.max(...points.map((p) => p.x), 0))}
+                      placeholderTextColor={COLORS.textSecondary}
+                      accessibilityLabel="Chiều dài phòng"
+                      returnKeyType="next"
+                    />
+                    <Text style={styles.unit}>m</Text>
+                  </View>
+                </View>
+                <View style={styles.dimField}>
+                  <Text style={styles.label}>Rộng (m)</Text>
+                  <View style={styles.inputWrap}>
+                    <TextInput
+                      style={styles.input}
+                      value={roomWidthInput}
+                      onChangeText={setRoomWidthInput}
+                      keyboardType="decimal-pad"
+                      selectTextOnFocus
+                      placeholder={fmt(Math.max(...points.map((p) => p.y), 0))}
+                      placeholderTextColor={COLORS.textSecondary}
+                      accessibilityLabel="Chiều rộng phòng"
+                      returnKeyType="next"
+                    />
+                    <Text style={styles.unit}>m</Text>
+                  </View>
+                </View>
+                <View style={styles.dimField}>
+                  <Text style={styles.label}>Cao (m)</Text>
+                  <View style={styles.inputWrap}>
+                    <TextInput
+                      style={styles.input}
+                      value={ceiling}
+                      onChangeText={setCeiling}
+                      keyboardType="decimal-pad"
+                      selectTextOnFocus
+                      accessibilityLabel="Chiều cao trần"
+                      returnKeyType="done"
+                      onSubmitEditing={applyRoomSize}
+                    />
+                    <Text style={styles.unit}>m</Text>
+                  </View>
                 </View>
               </View>
+              <Button title="Áp dụng kích thước" onPress={applyRoomSize} />
             </>
           )}
           {error ? <Text style={styles.error}>{error}</Text> : null}
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -596,6 +691,7 @@ const SmallAction: React.FC<SmallActionProps> = ({ icon, label, onPress, danger,
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
   flex: { flex: 1 },
+  canvasWrap: { flex: 1, minHeight: 200 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -640,11 +736,15 @@ const styles = StyleSheet.create({
   legendDot: { width: 14, height: 5, borderRadius: 2 },
   legendText: { fontSize: 12, fontFamily: FONT.regular, color: COLORS.textSecondary, marginRight: 8 },
   panel: {
-    padding: SPACING.md,
-    gap: SPACING.sm,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
     backgroundColor: COLORS.surface,
+    flexShrink: 0,
+    maxHeight: '45%',
+  },
+  panelContent: {
+    padding: SPACING.md,
+    gap: SPACING.sm,
   },
   panelTitle: { fontSize: 15, fontFamily: FONT.bold, color: COLORS.textPrimary },
   hint: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 18, color: COLORS.textSecondary },
@@ -694,6 +794,8 @@ const styles = StyleSheet.create({
   typeChipActive: { borderColor: COLORS.accent, backgroundColor: COLORS.accentSoft },
   typeChipText: { fontSize: 13, color: COLORS.textPrimary, fontFamily: FONT.semibold },
   error: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 17, color: COLORS.dangerText },
+  dimRow: { flexDirection: 'row', gap: SPACING.sm },
+  dimField: { flex: 1, gap: 4 },
 });
 
 export default RoomShapeEditor;

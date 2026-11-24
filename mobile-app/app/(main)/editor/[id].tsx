@@ -417,15 +417,24 @@ function Editor({ design, furniture, initialFloorPlan, addItem }: EditorProps) {
     h: Math.max(MIN_PLAN_ITEM, ((item?.depth ?? 100) / CM_PER_M / plan.roomDepth) * f.height),
   });
 
+  /* ---------------- Tự động lưu sau 2 giây khi có thay đổi ---------------- */
+  useEffect(() => {
+    if (!dirty || saving) return;
+    const timer = setTimeout(() => {
+      void handleSaveRef.current();
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [dirty, saving]);
+
   /* ---------------- Canh bao khi thoat ma chua luu ---------------- */
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
       if (!dirty) return;
       e.preventDefault();
-      Alert.alert('Chưa lưu thay đổi', 'Bạn có muốn bỏ các thay đổi chưa lưu?', [
-        { text: 'Ở lại', style: 'cancel' },
-        { text: 'Bỏ thay đổi', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
-      ]);
+      // Tu dong luu roi thoat
+      void handleSaveRef.current().finally(() => {
+        navigation.dispatch(e.data.action);
+      });
     });
     return unsubscribe;
   }, [navigation, dirty]);
@@ -710,6 +719,10 @@ function Editor({ design, furniture, initialFloorPlan, addItem }: EditorProps) {
   // Man Sua phong goi ham luu qua ref -> luon dung ban moi nhat (placements, history...)
   const saveShapeRef = useRef(handleSaveShape);
   saveShapeRef.current = handleSaveShape;
+
+  // handleSave cung qua ref de auto-save luon dung ban moi nhat
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
 
   /** Mo man "Sửa phòng" (man hinh rieng trong Stack, khong dung Modal - xem app/(main)/room-shape.tsx) */
   const openShapeEditor = (): void => {
