@@ -21,7 +21,7 @@ pipeline {
         booleanParam(name: 'DEPLOY', defaultValue: true,
             description: 'Deploy the new image locally with docker compose (container roomdecor-api) and start monitoring')
         string(name: 'UPLOADS_DIR',
-            defaultValue: '/run/desktop/mnt/host/c/Users/Admin/Downloads/room-decor-app-master (2)/room-decor-app-master/backend/uploads',d/uploads',
+            defaultValue: '/run/desktop/mnt/host/c/Users/TANBINHGAS/Desktop/room-decor-app-springboot/backend/uploads',
             description: 'Host folder for uploaded room photos, as Docker Desktop sees it (C:\\... = /run/desktop/mnt/host/c/...)')
     }
     options {
